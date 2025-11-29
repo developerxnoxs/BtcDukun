@@ -389,6 +389,15 @@ async def handle_timeframe_callback(update: Update, context: ContextTypes.DEFAUL
         except Exception:
             pass
     
+    if 'last_button_message_id' in context.user_data:
+        try:
+            await context.bot.delete_message(
+                chat_id=chat_id,
+                message_id=context.user_data['last_button_message_id']
+            )
+        except Exception:
+            pass
+    
     await query.edit_message_text(f"⏳ Mengambil data BTC/USDT ({interval})...")
     
     data = fetch_btc_kucoin(interval)
@@ -436,7 +445,10 @@ async def handle_timeframe_callback(update: Update, context: ContextTypes.DEFAUL
         )
         return
     
-    await query.edit_message_text(f"🤖 Menganalisa chart BTC/USDT ({interval}) dengan AI...")
+    try:
+        await query.message.delete()
+    except Exception:
+        pass
     
     analysis = analyze_image_with_gemini(chart_path)
     formatted = format_analysis_reply(analysis)
@@ -466,18 +478,21 @@ async def handle_timeframe_callback(update: Update, context: ContextTypes.DEFAUL
         except Exception as e:
             logger.error(f"Error edit caption: {e}")
     
-    select_text = "📊 *Pilih timeframe untuk analisa lagi:*"
     try:
-        await query.edit_message_text(
-            text=select_text,
+        button_message = await context.bot.send_message(
+            chat_id=chat_id,
+            text="📊 *Pilih timeframe untuk analisa lagi:*",
             parse_mode='Markdown',
             reply_markup=get_timeframe_keyboard()
         )
+        context.user_data['last_button_message_id'] = button_message.message_id
     except Exception:
-        await query.edit_message_text(
+        button_message = await context.bot.send_message(
+            chat_id=chat_id,
             text="📊 Pilih timeframe untuk analisa lagi:",
             reply_markup=get_timeframe_keyboard()
         )
+        context.user_data['last_button_message_id'] = button_message.message_id
     
     try:
         os.remove(chart_path)
