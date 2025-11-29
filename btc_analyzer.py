@@ -483,6 +483,14 @@ async def cmd_help(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(help_text, parse_mode='Markdown')
 
 
+async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Handle errors in the bot"""
+    logger.error(f"Exception while handling an update: {context.error}")
+    
+    if "Conflict" in str(context.error):
+        logger.warning("Bot conflict detected - another instance may be running")
+
+
 def main():
     """Fungsi utama untuk menjalankan bot"""
     if not TELEGRAM_BOT_TOKEN:
@@ -505,11 +513,16 @@ def main():
     app.add_handler(CommandHandler("analyze", cmd_analyze))
     app.add_handler(CommandHandler("help", cmd_help))
     app.add_handler(CallbackQueryHandler(handle_timeframe_callback))
+    app.add_error_handler(error_handler)
     
     print("✅ Bot aktif! Kirim /start ke bot Telegram Anda.")
     print("Press Ctrl+C to stop.")
+    print("⚠️ Pastikan tidak ada instance bot lain yang berjalan dengan token yang sama!")
     
-    app.run_polling(allowed_updates=Update.ALL_TYPES)
+    app.run_polling(
+        allowed_updates=Update.ALL_TYPES,
+        drop_pending_updates=True
+    )
 
 
 if __name__ == "__main__":
