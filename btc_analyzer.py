@@ -240,7 +240,7 @@ Berikan angka spesifik berdasarkan chart yang terlihat. Jika tidak bisa menentuk
 
 
 def format_analysis_reply(text):
-    """Format hasil analisa menjadi lebih readable"""
+    """Format hasil analisa menjadi lebih readable dengan spacing yang baik"""
     if not text or text.startswith("Error") or text.startswith("Timeout"):
         return text
     
@@ -248,47 +248,93 @@ def format_analysis_reply(text):
     text_clean = re.sub(r'\*([^*]+)\*', r'\1', text_clean)
     text_clean = re.sub(r'`([^`]+)`', r'\1', text_clean)
     
-    lines = text_clean.strip().split('\n')
-    formatted_lines = []
-    
-    emoji_map = {
-        'sinyal': '📊',
-        'signal': '📊',
-        'entry': '🎯',
-        'take profit': '💰',
-        'tp': '💰',
-        'stop loss': '🛑',
-        'sl': '🛑',
-        'pola': '🕯️',
-        'pattern': '🕯️',
-        'trend': '📈',
-        'support': '🔻',
-        'resistance': '🔺',
-        'kesimpulan': '🧠',
-        'conclusion': '🧠'
+    section_config = {
+        'sinyal': {'emoji': '📊', 'label': 'SINYAL', 'group': 'signal'},
+        'signal': {'emoji': '📊', 'label': 'SIGNAL', 'group': 'signal'},
+        'entry': {'emoji': '🎯', 'label': 'ENTRY', 'group': 'trading'},
+        'take profit': {'emoji': '💰', 'label': 'TAKE PROFIT', 'group': 'trading'},
+        'tp1': {'emoji': '   💰', 'label': 'TP1', 'group': 'trading'},
+        'tp2': {'emoji': '   💰', 'label': 'TP2', 'group': 'trading'},
+        'tp': {'emoji': '💰', 'label': 'TP', 'group': 'trading'},
+        'stop loss': {'emoji': '🛑', 'label': 'STOP LOSS', 'group': 'trading'},
+        'sl': {'emoji': '🛑', 'label': 'SL', 'group': 'trading'},
+        'pola': {'emoji': '🕯️', 'label': 'POLA', 'group': 'analysis'},
+        'pattern': {'emoji': '🕯️', 'label': 'PATTERN', 'group': 'analysis'},
+        'trend': {'emoji': '📈', 'label': 'TREND', 'group': 'analysis'},
+        'support': {'emoji': '🔻', 'label': 'SUPPORT', 'group': 'levels'},
+        'resistance': {'emoji': '🔺', 'label': 'RESISTANCE', 'group': 'levels'},
+        'kesimpulan': {'emoji': '🧠', 'label': 'KESIMPULAN', 'group': 'conclusion'},
+        'conclusion': {'emoji': '🧠', 'label': 'CONCLUSION', 'group': 'conclusion'}
     }
+    
+    sections = {
+        'signal': [],
+        'trading': [],
+        'analysis': [],
+        'levels': [],
+        'conclusion': [],
+        'other': []
+    }
+    
+    lines = text_clean.strip().split('\n')
     
     for line in lines:
         line = line.strip()
         if not line:
             continue
-            
+        
         if ':' in line:
             parts = line.split(':', 1)
             key = parts[0].strip().lower()
+            value = parts[1].strip() if len(parts) > 1 else ''
             
-            emoji = ''
-            for keyword, em in emoji_map.items():
+            matched = False
+            for keyword, config in section_config.items():
                 if keyword in key:
-                    emoji = em + ' '
+                    emoji = config['emoji']
+                    label = parts[0].strip().upper()
+                    formatted_line = f"{emoji} *{label}:*\n{value}"
+                    sections[config['group']].append(formatted_line)
+                    matched = True
                     break
             
-            formatted_lines.append(emoji + line)
+            if not matched and value:
+                sections['other'].append(f"• {parts[0].strip()}: {value}")
         else:
-            formatted_lines.append(line)
+            if line and not line.startswith('Oke') and not line.startswith('Berikut'):
+                sections['other'].append(line)
     
-    if formatted_lines:
-        return '\n'.join(formatted_lines)
+    result_parts = []
+    
+    if sections['signal']:
+        result_parts.append('\n'.join(sections['signal']))
+    
+    if sections['trading']:
+        if result_parts:
+            result_parts.append('')
+        result_parts.append('─── Trading Setup ───')
+        result_parts.append('\n'.join(sections['trading']))
+    
+    if sections['levels']:
+        if result_parts:
+            result_parts.append('')
+        result_parts.append('─── Support & Resistance ───')
+        result_parts.append('\n'.join(sections['levels']))
+    
+    if sections['analysis']:
+        if result_parts:
+            result_parts.append('')
+        result_parts.append('─── Technical Analysis ───')
+        result_parts.append('\n'.join(sections['analysis']))
+    
+    if sections['conclusion']:
+        if result_parts:
+            result_parts.append('')
+        result_parts.append('─── Kesimpulan ───')
+        result_parts.append('\n'.join(sections['conclusion']))
+    
+    if result_parts:
+        return '\n'.join(result_parts)
     else:
         return text
 
