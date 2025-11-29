@@ -391,6 +391,26 @@ async def handle_timeframe_callback(update: Update, context: ContextTypes.DEFAUL
             pass
         context.user_data.pop('last_chart_message_id', None)
     
+    if 'last_analysis_message_id' in context.user_data:
+        try:
+            await context.bot.delete_message(
+                chat_id=chat_id,
+                message_id=context.user_data['last_analysis_message_id']
+            )
+        except Exception:
+            pass
+        context.user_data.pop('last_analysis_message_id', None)
+    
+    if 'last_button_message_id' in context.user_data:
+        try:
+            await context.bot.delete_message(
+                chat_id=chat_id,
+                message_id=context.user_data['last_button_message_id']
+            )
+        except Exception:
+            pass
+        context.user_data.pop('last_button_message_id', None)
+    
     status_message = await context.bot.send_message(
         chat_id=chat_id,
         text=f"⏳ Mengambil data BTC/USDT ({interval})..."
@@ -445,7 +465,7 @@ async def handle_timeframe_callback(update: Update, context: ContextTypes.DEFAUL
             photo_message = await context.bot.send_photo(
                 chat_id=chat_id,
                 photo=photo,
-                caption=f"📊 BTC/USDT Chart ({interval})\n⏳ Menganalisa dengan AI..."
+                caption=f"📊 BTC/USDT Chart ({interval})"
             )
             context.user_data['last_chart_message_id'] = photo_message.message_id
     except Exception as e:
@@ -467,7 +487,7 @@ async def handle_timeframe_callback(update: Update, context: ContextTypes.DEFAUL
     analysis = analyze_image_with_gemini(chart_path)
     formatted = format_analysis_reply(analysis)
     
-    caption_text = f"""📈 *Hasil Analisa BTC/USDT ({interval})*
+    result_text = f"""📈 *Hasil Analisa BTC/USDT ({interval})*
 ━━━━━━━━━━━━━━━━━━━━
 
 {formatted}
@@ -476,37 +496,36 @@ async def handle_timeframe_callback(update: Update, context: ContextTypes.DEFAUL
 ⚠️ _Disclaimer: Ini bukan financial advice._"""
     
     try:
-        await context.bot.edit_message_caption(
-            chat_id=chat_id,
-            message_id=photo_message.message_id,
-            caption=caption_text,
-            parse_mode='Markdown'
-        )
-    except Exception:
-        try:
-            await context.bot.edit_message_caption(
-                chat_id=chat_id,
-                message_id=photo_message.message_id,
-                caption=caption_text.replace('*', '').replace('_', '')
-            )
-        except Exception as e:
-            logger.error(f"Error edit caption: {e}")
-    
-    try:
         await context.bot.edit_message_text(
             chat_id=chat_id,
             message_id=status_message.message_id,
+            text=result_text,
+            parse_mode='Markdown'
+        )
+        context.user_data['last_analysis_message_id'] = status_message.message_id
+    except Exception:
+        await context.bot.edit_message_text(
+            chat_id=chat_id,
+            message_id=status_message.message_id,
+            text=result_text.replace('*', '').replace('_', '')
+        )
+        context.user_data['last_analysis_message_id'] = status_message.message_id
+    
+    try:
+        button_message = await context.bot.send_message(
+            chat_id=chat_id,
             text="📊 *Pilih timeframe untuk analisa lagi:*",
             parse_mode='Markdown',
             reply_markup=get_timeframe_keyboard()
         )
+        context.user_data['last_button_message_id'] = button_message.message_id
     except Exception:
-        await context.bot.edit_message_text(
+        button_message = await context.bot.send_message(
             chat_id=chat_id,
-            message_id=status_message.message_id,
             text="📊 Pilih timeframe untuk analisa lagi:",
             reply_markup=get_timeframe_keyboard()
         )
+        context.user_data['last_button_message_id'] = button_message.message_id
     
     try:
         os.remove(chart_path)
