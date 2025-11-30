@@ -1,0 +1,783 @@
+#!/usr/bin/env python3
+"""
+XAUUSD (Gold) Technical Analysis Bot
+Tool CLI untuk analisa teknikal Gold/XAUUSD menggunakan Telegram Bot dan Gemini AI Vision
+Menggunakan API Ninjas untuk data historical gold
+"""
+
+import logging
+import base64
+import json
+import re
+import os
+import sys
+import requests
+import mplfinance as mpf
+import pandas as pd
+from datetime import datetime, timezone, timedelta
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
+from telegram.ext import Application, CommandHandler, CallbackQueryHandler, ContextTypes
+from pytz import timezone as tz
+import asyncio
+
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger(__name__)
+
+TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN_XAU", "")
+GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
+API_NINJAS_KEY = os.environ.get("API_NINJAS_KEY", "")
+
+INTERVAL_MAP = {
+    "1min": {"period": "1m", "seconds": 60, "candles": 200},
+    "5min": {"period": "5m", "seconds": 300, "candles": 200},
+    "15min": {"period": "15m", "seconds": 900, "candles": 200},
+    "30min": {"period": "30m", "seconds": 1800, "candles": 200},
+    "1hour": {"period": "1h", "seconds": 3600, "candles": 200},
+    "4hour": {"period": "4h", "seconds": 14400, "candles": 200},
+    "1day": {"period": "1d", "seconds": 86400, "candles": 200},
+}
+
+
+def fetch_xauusd_data(interval="1hour", candle_limit=200):
+    """Mengambil data candlestick XAUUSD dari API Ninjas"""
+    
+    if not API_NINJAS_KEY:
+        logger.error("API_NINJAS_KEY tidak ditemukan")
+        return None
+    
+    if interval not in INTERVAL_MAP:
+        logger.error(f"Interval tidak valid: {interval}")
+        return None
+    
+    interval_config = INTERVAL_MAP[interval]
+    period = interval_config["period"]
+    seconds_per_candle = interval_config["seconds"]
+    
+    end_at = int(datetime.now(timezone.utc).timestamp())
+    start_at = end_at - (seconds_per_candle * candle_limit)
+
+    try:
+        logger.info(f"Mengambil data XAUUSD interval {interval}...")
+        
+        response = requests.get(
+            "https://api.api-ninjas.com/v1/goldpricehistorical",
+            params={
+                "period": period,
+                "start": start_at,
+                "end": end_at
+            },
+            headers={
+                "X-Api-Key": API_NINJAS_KEY
+            },
+            timeout=30
+        )
+        
+        if response.status_code == 401:
+            logger.error("API Key tidak valid")
+            return None
+        
+        if response.status_code == 429:
+            logger.error("Rate limit tercapai")
+            return None
+            
+        response.raise_for_status()
+        data = response.json()
+        
+        if not data:
+            logger.warning("Tidak ada data yang diterima dari API Ninjas")
+            return None
+        
+        sorted_data = sorted(data, key=lambda x: x.get("time", 0))
+        logger.info(f"Berhasil mengambil {len(sorted_data)} candle XAUUSD")
+        return sorted_data
+        
+    except requests.exceptions.Timeout:
+        logger.error("Timeout saat mengambil data dari API Ninjas")
+        return None
+    except requests.exceptions.RequestException as e:
+        logger.error(f"Error request API Ninjas: {e}")
+        return None
+    except Exception as e:
+        logger.error(f"Error tidak terduga: {e}")
+        return None
+
+
+def get_current_gold_price():
+    """Mengambil harga gold terkini dari API Ninjas"""
+    if not API_NINJAS_KEY:
+        return None
+    
+    try:
+        response = requests.get(
+            "https://api.api-ninjas.com/v1/goldprice",
+            headers={"X-Api-Key": API_NINJAS_KEY},
+            timeout=10
+        )
+        
+        if response.status_code == 200:
+            data = response.json()
+            return data.get("price")
+    except Exception as e:
+        logger.error(f"Error getting gold price: {e}")
+    return None
+
+
+def generate_xauusd_chart(data, filename="xau_chart.png", tf="1hour"):
+    """Generate chart candlestick XAUUSD dari data OHLCV"""
+    if not data:
+        logger.error("Data kosong, tidak bisa generate chart")
+        return None
+    
+    try:
+        ohlc = []
+        for item in data:
+            ts = datetime.fromtimestamp(int(item.get("time", 0)), tz=tz("Asia/Jakarta"))
+            ohlc.append([
+                ts,
+                float(item.get("open", 0)),
+                float(item.get("high", 0)),
+                float(item.get("low", 0)),
+                float(item.get("close", 0)),
+                float(item.get("volume", 0))
+            ])
+        
+        df = pd.DataFrame(ohlc, columns=["Date", "Open", "High", "Low", "Close", "Volume"])
+        df.set_index("Date", inplace=True)
+        
+        if df.empty or len(df) < 5:
+            logger.error("Data tidak cukup untuk generate chart")
+            return None
+
+        mc = mpf.make_marketcolors(
+            up='#FFD700', down='#B8860B',
+            wick={'up': '#FFD700', 'down': '#B8860B'},
+            volume={'up': '#FFD700', 'down': '#B8860B'}
+        )
+        style = mpf.make_mpf_style(
+            marketcolors=mc,
+            gridstyle=':',
+            gridcolor='#e0e0e0',
+            facecolor='#1a1a2e',
+            edgecolor='#333333',
+            figcolor='#1a1a2e',
+            y_on_right=True
+        )
+
+        ema20 = df['Close'].ewm(span=20, adjust=False).mean()
+        ema50 = df['Close'].ewm(span=50, adjust=False).mean()
+        
+        addplots = [
+            mpf.make_addplot(ema20, color='#00BFFF', width=1.2, label='EMA20'),
+            mpf.make_addplot(ema50, color='#FF6347', width=1.2, label='EMA50')
+        ]
+
+        mpf.plot(
+            df, type='candle', volume=True, style=style,
+            title=f"\nXAUUSD - Gold ({tf})",
+            ylabel="Price (USD)",
+            ylabel_lower="Volume",
+            savefig=dict(fname=filename, dpi=150, bbox_inches='tight', facecolor='#1a1a2e'),
+            figratio=(16, 9),
+            figscale=1.3,
+            tight_layout=True,
+            addplot=addplots,
+            warn_too_much_data=500
+        )
+        
+        logger.info(f"Chart XAUUSD berhasil disimpan: {filename}")
+        return filename
+        
+    except Exception as e:
+        logger.error(f"Error generate chart: {e}")
+        import traceback
+        traceback.print_exc()
+        return None
+
+
+def analyze_xauusd_with_gemini(image_path):
+    """Analisa chart XAUUSD menggunakan Gemini Vision API"""
+    if not GEMINI_API_KEY:
+        return "GEMINI_API_KEY tidak ditemukan. Set environment variable terlebih dahulu."
+    
+    try:
+        with open(image_path, "rb") as f:
+            img_b64 = base64.b64encode(f.read()).decode("utf-8")
+    except FileNotFoundError:
+        return f"File tidak ditemukan: {image_path}"
+    except Exception as e:
+        return f"Error membaca file: {e}"
+
+    prompt = """Analisa chart candlestick XAUUSD (Gold/Emas vs USD) ini secara teknikal. Berikan analisa dalam format berikut:
+
+SINYAL: [BUY/SELL/HOLD] - [Alasan singkat]
+ENTRY: [Harga entry yang disarankan dalam USD]
+TAKE PROFIT: [Target TP1] dan [Target TP2]
+STOP LOSS: [Harga SL yang disarankan]
+POLA: [Pola candlestick yang terlihat, misalnya: Bullish Engulfing, Doji, Hammer, dll]
+TREND: [Trend saat ini: Uptrend/Downtrend/Sideways]
+SUPPORT: [Level support terdekat]
+RESISTANCE: [Level resistance terdekat]
+KESIMPULAN: [Ringkasan analisa dalam 1-2 kalimat untuk trading Gold/XAUUSD]
+
+Berikan angka spesifik berdasarkan chart yang terlihat. Perhatikan bahwa ini adalah chart Gold (XAUUSD) dengan harga dalam USD per troy ounce."""
+
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={GEMINI_API_KEY}"
+    
+    payload = {
+        "contents": [{
+            "role": "user",
+            "parts": [
+                {"text": prompt},
+                {"inline_data": {"mime_type": "image/png", "data": img_b64}}
+            ]
+        }],
+        "generationConfig": {
+            "temperature": 0.3,
+            "topP": 0.8,
+            "maxOutputTokens": 1024
+        }
+    }
+    
+    headers = {"Content-Type": "application/json"}
+    
+    try:
+        logger.info("Mengirim chart XAUUSD ke Gemini untuk analisa...")
+        response = requests.post(url, headers=headers, data=json.dumps(payload), timeout=60)
+        
+        if response.status_code == 200:
+            result = response.json()
+            
+            if "candidates" in result and len(result["candidates"]) > 0:
+                candidate = result["candidates"][0]
+                if "content" in candidate and "parts" in candidate["content"]:
+                    text = candidate["content"]["parts"][0].get("text", "")
+                    if text:
+                        logger.info("Analisa Gemini XAUUSD berhasil")
+                        return text
+            
+            logger.warning(f"Format respons tidak sesuai: {result}")
+            return "Format respons Gemini tidak sesuai. Coba lagi."
+            
+        elif response.status_code == 400:
+            error_detail = response.json()
+            logger.error(f"Bad request: {error_detail}")
+            return f"Error: Request tidak valid - {error_detail.get('error', {}).get('message', 'Unknown')}"
+            
+        elif response.status_code == 403:
+            return "Error: API key tidak valid atau tidak memiliki akses"
+            
+        elif response.status_code == 429:
+            return "Error: Rate limit tercapai. Tunggu beberapa saat dan coba lagi."
+            
+        else:
+            logger.error(f"Gemini API error: {response.status_code} - {response.text}")
+            return f"Error dari Gemini API (status: {response.status_code})"
+            
+    except requests.exceptions.Timeout:
+        return "Timeout saat menghubungi Gemini API. Coba lagi."
+    except requests.exceptions.RequestException as e:
+        logger.error(f"Request error: {e}")
+        return f"Error koneksi: {e}"
+    except Exception as e:
+        logger.error(f"Error tidak terduga: {e}")
+        return f"Error: {e}"
+
+
+def format_analysis_reply(text):
+    """Format hasil analisa menjadi lebih readable dengan spacing yang baik"""
+    if not text or text.startswith("Error") or text.startswith("Timeout"):
+        return text
+    
+    text_clean = re.sub(r'\*\*([^*]+)\*\*', r'\1', text)
+    text_clean = re.sub(r'\*([^*]+)\*', r'\1', text_clean)
+    text_clean = re.sub(r'`([^`]+)`', r'\1', text_clean)
+    text_clean = re.sub(r'^\s*[-•]\s*', '', text_clean, flags=re.MULTILINE)
+    
+    section_keywords = [
+        {'keywords': ['sinyal', 'signal'], 'emoji': '📊', 'group': 'signal'},
+        {'keywords': ['entry', 'masuk'], 'emoji': '🎯', 'group': 'trading'},
+        {'keywords': ['take profit', 'target', 'tp1', 'tp2', 'tp 1', 'tp 2'], 'emoji': '💰', 'group': 'trading'},
+        {'keywords': ['stop loss', 'stoploss', 'sl', 'cut loss'], 'emoji': '🛑', 'group': 'trading'},
+        {'keywords': ['pola', 'pattern', 'candlestick', 'candle'], 'emoji': '🕯️', 'group': 'analysis'},
+        {'keywords': ['trend', 'arah'], 'emoji': '📈', 'group': 'analysis'},
+        {'keywords': ['support', 'suport', 's1', 's2', 's3'], 'emoji': '🔻', 'group': 'levels'},
+        {'keywords': ['resistance', 'resisten', 'r1', 'r2', 'r3'], 'emoji': '🔺', 'group': 'levels'},
+        {'keywords': ['kesimpulan', 'conclusion', 'ringkasan', 'summary'], 'emoji': '🧠', 'group': 'conclusion'},
+    ]
+    
+    sections = {
+        'signal': [],
+        'trading': [],
+        'analysis': [],
+        'levels': [],
+        'conclusion': [],
+        'other': []
+    }
+    
+    lines = text_clean.strip().split('\n')
+    
+    for line in lines:
+        line = line.strip()
+        if not line:
+            continue
+        
+        if ':' in line:
+            parts = line.split(':', 1)
+            key = parts[0].strip().lower()
+            value = parts[1].strip() if len(parts) > 1 else ''
+            
+            if not value:
+                continue
+            
+            matched = False
+            for config in section_keywords:
+                for keyword in config['keywords']:
+                    if keyword in key or key in keyword:
+                        emoji = config['emoji']
+                        label = parts[0].strip().upper()
+                        formatted_line = f"{emoji} *{label}:*\n{value}"
+                        sections[config['group']].append(formatted_line)
+                        matched = True
+                        break
+                if matched:
+                    break
+            
+            if not matched and value and len(value) > 3:
+                sections['other'].append(f"• {parts[0].strip()}: {value}")
+        else:
+            skip_phrases = ['oke', 'berikut', 'analisa', 'berdasarkan', 'chart', 'gambar']
+            should_skip = any(phrase in line.lower() for phrase in skip_phrases)
+            if line and not should_skip and len(line) > 10:
+                sections['other'].append(line)
+    
+    result_parts = []
+    
+    if sections['signal']:
+        result_parts.append('\n\n'.join(sections['signal']))
+    
+    if sections['trading']:
+        if result_parts:
+            result_parts.append('')
+        result_parts.append('─── Trading Setup ───')
+        result_parts.append('\n\n'.join(sections['trading']))
+    
+    if sections['levels']:
+        if result_parts:
+            result_parts.append('')
+        result_parts.append('─── Support & Resistance ───')
+        result_parts.append('\n\n'.join(sections['levels']))
+    
+    if sections['analysis']:
+        if result_parts:
+            result_parts.append('')
+        result_parts.append('─── Technical Analysis ───')
+        result_parts.append('\n\n'.join(sections['analysis']))
+    
+    if sections['conclusion']:
+        if result_parts:
+            result_parts.append('')
+        result_parts.append('─── Kesimpulan ───')
+        result_parts.append('\n\n'.join(sections['conclusion']))
+    
+    if result_parts:
+        return '\n'.join(result_parts)
+    else:
+        return text
+
+
+def get_timeframe_keyboard():
+    """Generate keyboard untuk pilihan timeframe XAUUSD"""
+    return InlineKeyboardMarkup([
+        [
+            InlineKeyboardButton("1m", callback_data='xau_1min'),
+            InlineKeyboardButton("5m", callback_data='xau_5min'),
+            InlineKeyboardButton("15m", callback_data='xau_15min'),
+            InlineKeyboardButton("30m", callback_data='xau_30min'),
+        ],
+        [
+            InlineKeyboardButton("1h", callback_data='xau_1hour'),
+            InlineKeyboardButton("4h", callback_data='xau_4hour'),
+            InlineKeyboardButton("1d", callback_data='xau_1day'),
+        ],
+    ])
+
+
+def get_after_analysis_keyboard():
+    """Keyboard setelah analisa selesai"""
+    return InlineKeyboardMarkup([
+        [
+            InlineKeyboardButton("🔄 Analisa Lagi", callback_data='xau_menu'),
+        ],
+    ])
+
+
+async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handler untuk command /start"""
+    
+    current_price = get_current_gold_price()
+    price_text = f"💵 Harga saat ini: ${current_price:,.2f}/oz" if current_price else ""
+    
+    welcome_text = f"""🥇 *XAUUSD (Gold) Technical Analysis Bot*
+━━━━━━━━━━━━━━━━━━━━
+
+{price_text}
+
+*Fitur:*
+• Chart candlestick real-time
+• EMA20 & EMA50 indicators
+• Analisa AI dengan Gemini Vision
+• Multiple timeframe (1m - 1d)
+
+━━━━━━━━━━━━━━━━━━━━
+*Pilih timeframe untuk analisa XAUUSD:*"""
+    
+    await update.message.reply_text(
+        welcome_text,
+        reply_markup=get_timeframe_keyboard(),
+        parse_mode='Markdown'
+    )
+
+
+async def handle_menu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handler untuk kembali ke menu"""
+    query = update.callback_query
+    await query.answer()
+    
+    current_price = get_current_gold_price()
+    price_text = f"💵 Harga saat ini: ${current_price:,.2f}/oz" if current_price else ""
+    
+    text = f"""🥇 *XAUUSD (Gold) Technical Analysis Bot*
+━━━━━━━━━━━━━━━━━━━━
+{price_text}
+
+*Pilih timeframe untuk analisa:*"""
+    
+    await query.edit_message_text(
+        text=text,
+        reply_markup=get_timeframe_keyboard(),
+        parse_mode='Markdown'
+    )
+
+
+async def handle_timeframe_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handler untuk callback button timeframe"""
+    query = update.callback_query
+    await query.answer()
+    
+    interval = query.data.replace('xau_', '')
+    
+    if interval == 'menu':
+        return await handle_menu_callback(update, context)
+    
+    chat_id = query.message.chat_id
+    current_message_id = query.message.message_id
+    
+    if 'last_chart_message_id' in context.user_data:
+        try:
+            await context.bot.delete_message(
+                chat_id=chat_id,
+                message_id=context.user_data['last_chart_message_id']
+            )
+        except Exception:
+            pass
+        context.user_data.pop('last_chart_message_id', None)
+    
+    if 'last_analysis_message_id' in context.user_data:
+        try:
+            await context.bot.delete_message(
+                chat_id=chat_id,
+                message_id=context.user_data['last_analysis_message_id']
+            )
+        except Exception:
+            pass
+        context.user_data.pop('last_analysis_message_id', None)
+    
+    if 'last_button_message_id' in context.user_data:
+        try:
+            await context.bot.delete_message(
+                chat_id=chat_id,
+                message_id=context.user_data['last_button_message_id']
+            )
+        except Exception:
+            pass
+        context.user_data.pop('last_button_message_id', None)
+    
+    status_message = await context.bot.send_message(
+        chat_id=chat_id,
+        text=f"⏳ Mengambil data 🥇 XAUUSD ({interval})..."
+    )
+    
+    try:
+        await context.bot.delete_message(chat_id=chat_id, message_id=current_message_id)
+    except Exception:
+        pass
+    
+    data = fetch_xauusd_data(interval)
+    
+    if not data:
+        await context.bot.edit_message_text(
+            chat_id=chat_id,
+            message_id=status_message.message_id,
+            text="❌ Gagal mengambil data XAUUSD. Pastikan API_NINJAS_KEY sudah di-set.\n\n🥇 Pilih timeframe lain:",
+            reply_markup=get_timeframe_keyboard()
+        )
+        return
+    
+    if len(data) < 20:
+        await context.bot.edit_message_text(
+            chat_id=chat_id,
+            message_id=status_message.message_id,
+            text=f"❌ Data terlalu sedikit ({len(data)} candle). Minimal 20 candle diperlukan.\n\n🥇 Pilih timeframe lain:",
+            reply_markup=get_timeframe_keyboard()
+        )
+        return
+    
+    await context.bot.edit_message_text(
+        chat_id=chat_id,
+        message_id=status_message.message_id,
+        text=f"📊 Generating chart 🥇 XAUUSD ({interval})..."
+    )
+    
+    filename = f"xau_chart_{interval}_{int(datetime.now().timestamp())}.png"
+    chart_path = generate_xauusd_chart(data, filename, interval)
+    
+    if not chart_path:
+        await context.bot.edit_message_text(
+            chat_id=chat_id,
+            message_id=status_message.message_id,
+            text="❌ Gagal membuat chart. Coba lagi.\n\n🥇 Pilih timeframe:",
+            reply_markup=get_timeframe_keyboard()
+        )
+        return
+    
+    photo_message = None
+    try:
+        with open(chart_path, "rb") as photo:
+            photo_message = await context.bot.send_photo(
+                chat_id=chat_id,
+                photo=photo,
+                caption=f"🥇 XAUUSD Chart ({interval})"
+            )
+            context.user_data['last_chart_message_id'] = photo_message.message_id
+    except Exception as e:
+        logger.error(f"Error mengirim photo: {e}")
+        await context.bot.edit_message_text(
+            chat_id=chat_id,
+            message_id=status_message.message_id,
+            text="❌ Gagal mengirim chart.\n\n🥇 Pilih timeframe:",
+            reply_markup=get_timeframe_keyboard()
+        )
+        return
+    
+    await context.bot.edit_message_text(
+        chat_id=chat_id,
+        message_id=status_message.message_id,
+        text=f"🤖 Menganalisa chart XAUUSD dengan AI..."
+    )
+    
+    analysis = analyze_xauusd_with_gemini(chart_path)
+    formatted = format_analysis_reply(analysis)
+    
+    result_text = f"""🥇 *Hasil Analisa XAUUSD ({interval})*
+━━━━━━━━━━━━━━━━━━━━
+
+{formatted}
+
+━━━━━━━━━━━━━━━━━━━━
+⚠️ _Disclaimer: Ini bukan financial advice._"""
+    
+    try:
+        await context.bot.edit_message_text(
+            chat_id=chat_id,
+            message_id=status_message.message_id,
+            text=result_text,
+            parse_mode='Markdown'
+        )
+        context.user_data['last_analysis_message_id'] = status_message.message_id
+    except Exception:
+        await context.bot.edit_message_text(
+            chat_id=chat_id,
+            message_id=status_message.message_id,
+            text=result_text.replace('*', '').replace('_', '')
+        )
+        context.user_data['last_analysis_message_id'] = status_message.message_id
+    
+    try:
+        button_message = await context.bot.send_message(
+            chat_id=chat_id,
+            text="🥇 *Pilih timeframe untuk analisa lagi:*",
+            parse_mode='Markdown',
+            reply_markup=get_timeframe_keyboard()
+        )
+        context.user_data['last_button_message_id'] = button_message.message_id
+    except Exception:
+        button_message = await context.bot.send_message(
+            chat_id=chat_id,
+            text="🥇 Pilih timeframe untuk analisa lagi:",
+            reply_markup=get_timeframe_keyboard()
+        )
+        context.user_data['last_button_message_id'] = button_message.message_id
+    
+    try:
+        os.remove(chart_path)
+    except:
+        pass
+
+
+async def cmd_analyze(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handler untuk command /analyze [timeframe]"""
+    args = context.args
+    
+    if not args:
+        await update.message.reply_text(
+            "Penggunaan: /analyze <timeframe>\n"
+            "Contoh: /analyze 1hour\n\n"
+            "Timeframe tersedia: 1min, 5min, 15min, 30min, 1hour, 4hour, 1day"
+        )
+        return
+    
+    interval = args[0].lower()
+    if interval not in INTERVAL_MAP:
+        await update.message.reply_text(
+            f"❌ Timeframe tidak valid: {interval}\n"
+            "Gunakan: 1min, 5min, 15min, 30min, 1hour, 4hour, 1day"
+        )
+        return
+    
+    await update.message.reply_text(f"⏳ Mengambil data 🥇 XAUUSD ({interval})...")
+    
+    data = fetch_xauusd_data(interval)
+    if not data or len(data) < 20:
+        await update.message.reply_text("❌ Gagal mengambil data atau data terlalu sedikit. Pastikan API_NINJAS_KEY sudah di-set.")
+        return
+    
+    await update.message.reply_text("📊 Generating chart...")
+    
+    filename = f"xau_chart_{interval}_{int(datetime.now().timestamp())}.png"
+    chart_path = generate_xauusd_chart(data, filename, interval)
+    
+    if not chart_path:
+        await update.message.reply_text("❌ Gagal membuat chart.")
+        return
+    
+    with open(chart_path, "rb") as photo:
+        await update.message.reply_photo(
+            photo=photo,
+            caption=f"🥇 XAUUSD ({interval})\n⏳ Menganalisa..."
+        )
+    
+    analysis = analyze_xauusd_with_gemini(chart_path)
+    formatted = format_analysis_reply(analysis)
+    
+    await update.message.reply_text(
+        f"🥇 Hasil Analisa XAUUSD ({interval}):\n\n{formatted}\n\n"
+        "⚠️ Disclaimer: Bukan financial advice.",
+        reply_markup=get_after_analysis_keyboard()
+    )
+    
+    try:
+        os.remove(chart_path)
+    except:
+        pass
+
+
+async def cmd_price(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handler untuk command /price - menampilkan harga gold terkini"""
+    price = get_current_gold_price()
+    
+    if price:
+        await update.message.reply_text(
+            f"🥇 *Harga Gold (XAUUSD) Saat Ini*\n\n"
+            f"💵 *${price:,.2f}* per troy ounce\n\n"
+            f"_Data dari API Ninjas_",
+            parse_mode='Markdown',
+            reply_markup=get_timeframe_keyboard()
+        )
+    else:
+        await update.message.reply_text(
+            "❌ Gagal mengambil harga gold. Pastikan API_NINJAS_KEY sudah di-set."
+        )
+
+
+async def cmd_help(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handler untuk command /help"""
+    help_text = """📖 *Panduan Penggunaan Bot XAUUSD*
+
+*Commands:*
+/start - Pilih timeframe dengan tombol
+/analyze <tf> - Analisa langsung (misal: /analyze 1hour)
+/price - Lihat harga gold terkini
+/help - Tampilkan bantuan ini
+
+*Timeframe tersedia:*
+1min, 5min, 15min, 30min, 1hour, 4hour, 1day
+
+*Fitur:*
+• Chart candlestick dengan EMA20 & EMA50
+• Analisa AI menggunakan Gemini Vision
+• Sinyal BUY/SELL/HOLD
+• Entry, TP, dan SL recommendation
+• Pattern recognition
+
+*API yang digunakan:*
+• API Ninjas - Gold Price Historical Data
+• Google Gemini Vision - AI Analysis
+
+⚠️ *Disclaimer:* Bot ini hanya untuk edukasi. Bukan financial advice."""
+    
+    await update.message.reply_text(help_text, parse_mode='Markdown')
+
+
+async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Handle errors in the bot"""
+    logger.error(f"Exception while handling an update: {context.error}")
+    
+    if "Conflict" in str(context.error):
+        logger.warning("Bot conflict detected - another instance may be running")
+
+
+def main():
+    """Fungsi utama untuk menjalankan bot"""
+    if not TELEGRAM_BOT_TOKEN:
+        print("❌ Error: TELEGRAM_BOT_TOKEN_XAU tidak ditemukan!")
+        print("Set environment variable: export TELEGRAM_BOT_TOKEN_XAU='your_token'")
+        print("Buat bot baru di @BotFather untuk XAUUSD analyzer")
+        sys.exit(1)
+    
+    if not API_NINJAS_KEY:
+        print("⚠️ Warning: API_NINJAS_KEY tidak ditemukan!")
+        print("Data XAUUSD tidak akan bisa diambil tanpa API key.")
+        print("Dapatkan API key gratis di: https://api-ninjas.com/")
+        print("Set environment variable: export API_NINJAS_KEY='your_key'")
+    
+    if not GEMINI_API_KEY:
+        print("⚠️ Warning: GEMINI_API_KEY tidak ditemukan!")
+        print("Analisa AI tidak akan berfungsi tanpa API key.")
+        print("Set environment variable: export GEMINI_API_KEY='your_key'")
+    
+    print("🥇 Starting XAUUSD (Gold) Analysis Bot...")
+    print(f"📊 Telegram Token: {TELEGRAM_BOT_TOKEN[:10]}...")
+    print(f"🔑 API Ninjas: {'Configured' if API_NINJAS_KEY else 'Not configured'}")
+    print(f"🤖 Gemini API: {'Configured' if GEMINI_API_KEY else 'Not configured'}")
+    
+    app = Application.builder().token(TELEGRAM_BOT_TOKEN).build()
+    
+    app.add_handler(CommandHandler("start", cmd_start))
+    app.add_handler(CommandHandler("analyze", cmd_analyze))
+    app.add_handler(CommandHandler("price", cmd_price))
+    app.add_handler(CommandHandler("help", cmd_help))
+    
+    app.add_handler(CallbackQueryHandler(handle_timeframe_callback, pattern=r'^xau_'))
+    
+    app.add_error_handler(error_handler)
+    
+    print("✅ Bot XAUUSD siap menerima pesan!")
+    
+    app.run_polling(allowed_updates=Update.ALL_TYPES, drop_pending_updates=True)
+
+
+if __name__ == "__main__":
+    main()
