@@ -54,7 +54,6 @@ XAUUSD (Gold)
 
 **For XAUUSD Bot:**
 - `TELEGRAM_BOT_TOKEN_XAU` - Separate Telegram Bot token for XAUUSD bot (create new bot at @BotFather)
-- `FINNHUB_API_KEY` - Finnhub API key for XAUUSD candlestick data (get free at https://finnhub.io/)
 
 **Note:** Each Telegram bot needs its own unique token. The crypto bot uses `TELEGRAM_BOT_TOKEN` and the gold bot uses `TELEGRAM_BOT_TOKEN_XAU`.
 

@@ -19,6 +19,11 @@ from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.ext import Application, CommandHandler, CallbackQueryHandler, ContextTypes
 from pytz import timezone as tz
 
+try:
+    import yfinance as yf
+except ImportError:
+    yf = None
+
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(levelname)s - %(message)s'
@@ -27,34 +32,23 @@ logger = logging.getLogger(__name__)
 
 TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN_XAU", "")
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
-FINNHUB_API_KEY = os.environ.get("FINNHUB_API_KEY", "")
 
 INTERVAL_MAP = {
-    "1min": 60,
-    "5min": 300,
-    "15min": 900,
-    "30min": 1800,
-    "1hour": 3600,
-    "4hour": 14400,
-    "1day": 86400,
-}
-
-FINNHUB_INTERVAL = {
-    "1min": "1",
-    "5min": "5",
-    "15min": "15",
-    "30min": "30",
-    "1hour": "60",
-    "4hour": "D",
-    "1day": "D",
+    "1min": "1m",
+    "5min": "5m",
+    "15min": "15m",
+    "30min": "30m",
+    "1hour": "1h",
+    "4hour": "4h",
+    "1day": "1d",
 }
 
 
 def fetch_xauusd_data(interval="1hour"):
-    """Mengambil data candlestick XAUUSD dari Finnhub API"""
+    """Mengambil data candlestick XAUUSD dari Yahoo Finance"""
     
-    if not FINNHUB_API_KEY:
-        logger.error("FINNHUB_API_KEY tidak ditemukan")
+    if not yf:
+        logger.error("yfinance library tidak tersedia")
         return None
     
     if interval not in INTERVAL_MAP:
@@ -64,88 +58,54 @@ def fetch_xauusd_data(interval="1hour"):
     try:
         logger.info(f"Mengambil data XAUUSD interval {interval}...")
         
-        fb_interval = FINNHUB_INTERVAL[interval]
+        yf_interval = INTERVAL_MAP[interval]
         
-        # Hitung waktu untuk request
-        now = datetime.now(timezone.utc)
-        start_time = int((now - timedelta(days=30)).timestamp())
-        end_time = int(now.timestamp())
+        # Download data using yfinance
+        ticker = yf.Ticker("GC=F")  # Gold futures (XAUUSD proxy)
         
-        response = requests.get(
-            "https://finnhub.io/api/v1/forex/candle",
-            params={
-                "symbol": "OANDA:XAU_USD",
-                "resolution": fb_interval,
-                "from": start_time,
-                "to": end_time,
-                "token": FINNHUB_API_KEY
-            },
-            timeout=30
-        )
+        # Determine period based on interval
+        if interval in ["1min", "5min", "15min", "30min"]:
+            period = "5d"
+        else:
+            period = "1y"
         
-        response.raise_for_status()
-        data = response.json()
+        df = ticker.history(period=period, interval=yf_interval)
         
-        # Check for errors
-        if data.get("s") == "no_data":
-            logger.warning("Tidak ada data XAUUSD dari Finnhub")
+        if df.empty:
+            logger.warning("Tidak ada data XAUUSD dari Yahoo Finance")
             return None
         
-        if "o" not in data or not data.get("o"):
-            logger.error(f"Response format tidak expected: {data}")
-            return None
-        
-        # Convert Finnhub format to candlestick format
+        # Convert to candlestick format
         candles = []
-        opens = data.get("o", [])
-        highs = data.get("h", [])
-        lows = data.get("l", [])
-        closes = data.get("c", [])
-        timestamps = data.get("t", [])
-        volumes = data.get("v", [])
-        
-        for i, ts in enumerate(timestamps[-200:]):  # Take last 200 candles
+        for timestamp, row in df.iterrows():
             candles.append({
-                "time": ts,
-                "open": float(opens[i]) if i < len(opens) else 0,
-                "high": float(highs[i]) if i < len(highs) else 0,
-                "low": float(lows[i]) if i < len(lows) else 0,
-                "close": float(closes[i]) if i < len(closes) else 0,
-                "volume": float(volumes[i]) if i < len(volumes) else 0
+                "time": int(timestamp.timestamp()),
+                "open": float(row.get("Open", 0)),
+                "high": float(row.get("High", 0)),
+                "low": float(row.get("Low", 0)),
+                "close": float(row.get("Close", 0)),
+                "volume": float(row.get("Volume", 0))
             })
         
         logger.info(f"Berhasil mengambil {len(candles)} candle XAUUSD")
-        return candles
+        return candles[-200:] if len(candles) > 200 else candles
         
-    except requests.exceptions.Timeout:
-        logger.error("Timeout saat mengambil data dari Finnhub")
-        return None
-    except requests.exceptions.RequestException as e:
-        logger.error(f"Error request Finnhub: {e}")
-        return None
     except Exception as e:
-        logger.error(f"Error tidak terduga: {e}")
+        logger.error(f"Error mengambil data XAUUSD: {e}")
         return None
 
 
 def get_current_gold_price():
-    """Mengambil harga gold terkini dari Finnhub"""
-    if not FINNHUB_API_KEY:
+    """Mengambil harga gold terkini dari Yahoo Finance"""
+    
+    if not yf:
         return None
     
     try:
-        response = requests.get(
-            "https://finnhub.io/api/v1/quote",
-            params={
-                "symbol": "OANDA:XAU_USD",
-                "token": FINNHUB_API_KEY
-            },
-            timeout=10
-        )
-        
-        if response.status_code == 200:
-            data = response.json()
-            return data.get("c")  # current price
+        ticker = yf.Ticker("GC=F")
+        data = ticker.history(period="1d", interval="1m")
+        if not data.empty:
+            return float(data.iloc[-1]["Close"])
     except Exception as e:
         logger.error(f"Error getting gold price: {e}")
     return None
@@ -680,12 +640,6 @@ def main():
         print("Buat bot baru di @BotFather untuk XAUUSD analyzer")
         sys.exit(1)
     
-    if not FINNHUB_API_KEY:
-        print("⚠️ Warning: FINNHUB_API_KEY tidak ditemukan!")
-        print("Data XAUUSD tidak akan bisa diambil tanpa API key.")
-        print("Dapatkan API key gratis di: https://finnhub.io/")
-        print("Set environment variable: export FINNHUB_API_KEY='your_key'")
-    
     if not GEMINI_API_KEY:
         print("⚠️ Warning: GEMINI_API_KEY tidak ditemukan!")
         print("Analisa AI tidak akan berfungsi tanpa API key.")
@@ -693,7 +647,7 @@ def main():
     
     print("🥇 Starting XAUUSD (Gold) Analysis Bot...")
     print(f"📊 Telegram Token: {TELEGRAM_BOT_TOKEN[:10]}...")
-    print(f"🔑 Finnhub API: {'Configured' if FINNHUB_API_KEY else 'Not configured'}")
+    print(f"📊 Data Source: Yahoo Finance (GC=F)")
     print(f"🤖 Gemini API: {'Configured' if GEMINI_API_KEY else 'Not configured'}")
     
     app = Application.builder().token(TELEGRAM_BOT_TOKEN).build()
