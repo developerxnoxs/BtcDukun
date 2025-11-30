@@ -95,21 +95,18 @@ def fetch_xauusd_data(interval="1hour"):
             return None
         
         # Extract time series data based on interval
+        # Alpha Vantage FX API uses specific key names
         if av_interval == "daily":
-            time_series_key = "Time Series (Daily)"
-        elif av_interval == "60min":
-            time_series_key = "Time Series (60min)"
-        elif av_interval == "30min":
-            time_series_key = "Time Series (30min)"
-        elif av_interval == "15min":
-            time_series_key = "Time Series (15min)"
-        elif av_interval == "5min":
-            time_series_key = "Time Series (5min)"
+            time_series_key = "Time Series FX (Daily)"
         else:
-            time_series_key = "Time Series (1min)"
+            # All intraday intervals use the same key
+            time_series_key = "Time Series FX (Intraday)"
         
         if time_series_key not in data:
-            logger.warning(f"Data time series tidak ditemukan. Keys: {list(data.keys())}")
+            logger.warning(f"Data time series '{time_series_key}' tidak ditemukan.")
+            logger.warning(f"Response keys: {list(data.keys())}")
+            if "Meta Data" in data:
+                logger.warning(f"Meta Data: {data['Meta Data']}")
             return None
         
         time_series = data[time_series_key]
