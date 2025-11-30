@@ -146,16 +146,16 @@ def generate_candlestick_chart(data, filename="chart.png", symbol="BTC", tf="15m
         df.set_index("Date", inplace=True)
 
         mc = mpf.make_marketcolors(
-            up='#26a69a', down='#ef5350',
-            wick={'up': '#26a69a', 'down': '#ef5350'},
-            volume={'up': '#26a69a', 'down': '#ef5350'}
+            up='#00AA00', down='#FF0000',
+            wick={'up': '#00AA00', 'down': '#FF0000'},
+            volume={'up': '#00AA00', 'down': '#FF0000'}
         )
         style = mpf.make_mpf_style(
             marketcolors=mc,
             gridstyle=':',
-            gridcolor='#e0e0e0',
-            facecolor='white',
-            edgecolor='#333333'
+            gridcolor='#cccccc',
+            facecolor='#f5f5f5',
+            edgecolor='#666666'
         )
 
         ema20 = df['Close'].ewm(span=20, adjust=False).mean()

@@ -138,16 +138,16 @@ def generate_xauusd_chart(data, filename="xau_chart.png", tf="1hour"):
             return None
 
         mc = mpf.make_marketcolors(
-            up='#FFD700', down='#B8860B',
-            wick={'up': '#FFD700', 'down': '#B8860B'},
-            volume={'up': '#FFD700', 'down': '#B8860B'}
+            up='#00AA00', down='#FF0000',
+            wick={'up': '#00AA00', 'down': '#FF0000'},
+            volume={'up': '#00AA00', 'down': '#FF0000'}
         )
         style = mpf.make_mpf_style(
             marketcolors=mc,
             gridstyle=':',
-            gridcolor='#e0e0e0',
-            facecolor='#1a1a2e',
-            edgecolor='#333333'
+            gridcolor='#cccccc',
+            facecolor='#f5f5f5',
+            edgecolor='#666666'
         )
 
         ema20 = df['Close'].ewm(span=20, adjust=False).mean()
