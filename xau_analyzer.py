@@ -63,8 +63,8 @@ def fetch_xauusd_data(interval="1hour"):
         # Download data using yfinance
         ticker = yf.Ticker("GC=F")  # Gold futures (XAUUSD proxy)
         
-        # Fetch longer period to ensure data availability, then filter to today only
-        period = "60d"
+        # Use longer period for stable data fetch
+        period = "3mo"
         
         df = ticker.history(period=period, interval=yf_interval)
         
@@ -77,32 +77,6 @@ def fetch_xauusd_data(interval="1hour"):
         if df.empty:
             logger.warning("Semua data XAUUSD adalah NaN")
             return None
-        
-        # Filter to today's data only (last 24 hours)
-        now = datetime.now(timezone.utc)
-        start_of_day = now.replace(hour=0, minute=0, second=0, microsecond=0)
-        df = df[df.index >= start_of_day]
-        
-        if df.empty:
-            logger.warning("Tidak ada data XAUUSD untuk hari ini")
-            # Fallback: ambil 24 jam terakhir
-            df = ticker.history(period=period, interval=yf_interval).dropna()
-            if not df.empty:
-                last_24h = df.iloc[-200:] if len(df) > 200 else df
-                df = last_24h
-        
-        if df.empty:
-            logger.warning("Tidak ada data XAUUSD yang tersedia")
-            return None
-        
-        # For intraday, remove outlier volumes (likely flash trades/gaps)
-        if interval in ["1min", "5min", "15min", "30min"]:
-            volume_q75 = df['Volume'].quantile(0.75)
-            volume_q25 = df['Volume'].quantile(0.25)
-            iqr = volume_q75 - volume_q25
-            upper_bound = volume_q75 + (1.5 * iqr)
-            # Cap extreme volume spikes
-            df['Volume'] = df['Volume'].clip(upper=upper_bound)
         
         # Convert to candlestick format (list of arrays like btc_analyzer)
         candles = []
