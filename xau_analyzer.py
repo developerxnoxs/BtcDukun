@@ -607,7 +607,7 @@ async def cmd_price(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
     else:
         await update.message.reply_text(
-            "❌ Gagal mengambil harga gold. Pastikan FINNHUB_API_KEY sudah di-set."
+            "❌ Gagal mengambil harga gold. Coba lagi nanti."
         )
 
 
@@ -631,7 +631,7 @@ async def cmd_help(update: Update, context: ContextTypes.DEFAULT_TYPE):
 • Entry, TP, dan SL recommendation
 
 *API yang digunakan:*
-• Finnhub - XAUUSD historical candlestick data
+• Yahoo Finance - XAUUSD historical candlestick data
 • Google Gemini Vision - AI Analysis
 
 ⚠️ *Disclaimer:* Bot ini hanya untuk edukasi. Bukan financial advice."""
