@@ -63,9 +63,9 @@ def fetch_xauusd_data(interval="1hour"):
         # Download data using yfinance
         ticker = yf.Ticker("GC=F")  # Gold futures (XAUUSD proxy)
         
-        # Determine period based on interval
+        # Determine period based on interval - use less data for intraday to avoid weekend gaps
         if interval in ["1min", "5min", "15min", "30min"]:
-            period = "5d"
+            period = "3d"  # Changed from 5d to 3d to avoid weekend data
         else:
             period = "1y"
         
@@ -80,6 +80,15 @@ def fetch_xauusd_data(interval="1hour"):
         if df.empty:
             logger.warning("Semua data XAUUSD adalah NaN")
             return None
+        
+        # For intraday, remove outlier volumes (likely flash trades/gaps)
+        if interval in ["1min", "5min", "15min", "30min"]:
+            volume_q75 = df['Volume'].quantile(0.75)
+            volume_q25 = df['Volume'].quantile(0.25)
+            iqr = volume_q75 - volume_q25
+            upper_bound = volume_q75 + (1.5 * iqr)
+            # Cap extreme volume spikes
+            df['Volume'] = df['Volume'].clip(upper=upper_bound)
         
         # Convert to candlestick format (list of arrays like btc_analyzer)
         candles = []
