@@ -20,6 +20,19 @@ from telegram.ext import Application, CommandHandler, CallbackQueryHandler, Cont
 from pytz import timezone as tz
 import asyncio
 
+try:
+    from tvDatafeed import TvDatafeed, Interval
+    tv = TvDatafeed()
+    TV_AVAILABLE = True
+except ImportError:
+    TV_AVAILABLE = False
+    tv = None
+
+try:
+    import yfinance as yf
+except ImportError:
+    yf = None
+
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(levelname)s - %(message)s'
@@ -30,27 +43,44 @@ TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN", "")
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
 
 SUPPORTED_COINS = {
-    "BTC": {"name": "Bitcoin", "emoji": "₿", "color": "#F7931A"},
-    "ETH": {"name": "Ethereum", "emoji": "Ξ", "color": "#627EEA"},
-    "SOL": {"name": "Solana", "emoji": "◎", "color": "#00FFA3"},
-    "BNB": {"name": "BNB", "emoji": "🔶", "color": "#F3BA2F"},
-    "XRP": {"name": "Ripple", "emoji": "✕", "color": "#23292F"},
-    "ADA": {"name": "Cardano", "emoji": "₳", "color": "#0033AD"},
-    "DOGE": {"name": "Dogecoin", "emoji": "🐕", "color": "#C2A633"},
-    "AVAX": {"name": "Avalanche", "emoji": "🔺", "color": "#E84142"},
-    "MATIC": {"name": "Polygon", "emoji": "⬡", "color": "#8247E5"},
-    "LINK": {"name": "Chainlink", "emoji": "⬡", "color": "#2A5ADA"},
-    "DOT": {"name": "Polkadot", "emoji": "●", "color": "#E6007A"},
-    "ATOM": {"name": "Cosmos", "emoji": "⚛", "color": "#2E3148"},
-    "UNI": {"name": "Uniswap", "emoji": "🦄", "color": "#FF007A"},
-    "LTC": {"name": "Litecoin", "emoji": "Ł", "color": "#345D9D"},
+    "BTC": {"name": "Bitcoin", "emoji": "₿", "color": "#F7931A", "yf_symbol": "BTC-USD", "tv_symbol": "BTCUSDT"},
+    "ETH": {"name": "Ethereum", "emoji": "Ξ", "color": "#627EEA", "yf_symbol": "ETH-USD", "tv_symbol": "ETHUSDT"},
+    "SOL": {"name": "Solana", "emoji": "◎", "color": "#00FFA3", "yf_symbol": "SOL-USD", "tv_symbol": "SOLUSDT"},
+    "BNB": {"name": "BNB", "emoji": "🔶", "color": "#F3BA2F", "yf_symbol": "BNB-USD", "tv_symbol": "BNBUSDT"},
+    "XRP": {"name": "Ripple", "emoji": "✕", "color": "#23292F", "yf_symbol": "XRP-USD", "tv_symbol": "XRPUSDT"},
+    "ADA": {"name": "Cardano", "emoji": "₳", "color": "#0033AD", "yf_symbol": "ADA-USD", "tv_symbol": "ADAUSDT"},
+    "DOGE": {"name": "Dogecoin", "emoji": "🐕", "color": "#C2A633", "yf_symbol": "DOGE-USD", "tv_symbol": "DOGEUSDT"},
+    "AVAX": {"name": "Avalanche", "emoji": "🔺", "color": "#E84142", "yf_symbol": "AVAX-USD", "tv_symbol": "AVAXUSDT"},
+    "MATIC": {"name": "Polygon", "emoji": "⬡", "color": "#8247E5", "yf_symbol": "MATIC-USD", "tv_symbol": "MATICUSDT"},
+    "LINK": {"name": "Chainlink", "emoji": "⬡", "color": "#2A5ADA", "yf_symbol": "LINK-USD", "tv_symbol": "LINKUSDT"},
+    "DOT": {"name": "Polkadot", "emoji": "●", "color": "#E6007A", "yf_symbol": "DOT-USD", "tv_symbol": "DOTUSDT"},
+    "ATOM": {"name": "Cosmos", "emoji": "⚛", "color": "#2E3148", "yf_symbol": "ATOM-USD", "tv_symbol": "ATOMUSDT"},
+    "UNI": {"name": "Uniswap", "emoji": "🦄", "color": "#FF007A", "yf_symbol": "UNI-USD", "tv_symbol": "UNIUSDT"},
+    "LTC": {"name": "Litecoin", "emoji": "Ł", "color": "#345D9D", "yf_symbol": "LTC-USD", "tv_symbol": "LTCUSDT"},
 }
 
 INTERVAL_MAP = {
+    "1min": "1m", "5min": "5m", "15min": "15m",
+    "30min": "30m", "1hour": "1h", "4hour": "4h",
+    "1day": "1d", "1week": "1wk"
+}
+
+KUCOIN_INTERVAL_MAP = {
     "1min": 60, "3min": 180, "5min": 300, "15min": 900,
     "30min": 1800, "1hour": 3600, "2hour": 7200,
     "4hour": 14400, "6hour": 21600, "8hour": 28800,
     "12hour": 43200, "1day": 86400, "1week": 604800
+}
+
+TV_INTERVAL_MAP = {
+    "1min": Interval.in_1_minute if TV_AVAILABLE else None,
+    "5min": Interval.in_5_minute if TV_AVAILABLE else None,
+    "15min": Interval.in_15_minute if TV_AVAILABLE else None,
+    "30min": Interval.in_30_minute if TV_AVAILABLE else None,
+    "1hour": Interval.in_1_hour if TV_AVAILABLE else None,
+    "4hour": Interval.in_4_hour if TV_AVAILABLE else None,
+    "1day": Interval.in_daily if TV_AVAILABLE else None,
+    "1week": Interval.in_weekly if TV_AVAILABLE else None,
 }
 
 
