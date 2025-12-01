@@ -80,10 +80,32 @@ pip install pillow
 print_status "Pillow installed"
 
 echo ""
-echo "Langkah 8: Install sisa packages dari requirements.txt..."
+echo "Langkah 8: Install yfinance dengan dependencies..."
 echo "----------------------------------------------"
-pip install python-telegram-bot pytz requests yfinance nest-asyncio
+print_warning "yfinance membutuhkan beberapa dependencies tambahan..."
+pip install --upgrade requests urllib3 certifi
+pip install lxml html5lib beautifulsoup4
+pip install yfinance
+print_status "yfinance installed"
+
+echo ""
+echo "Langkah 9: Install sisa packages..."
+echo "----------------------------------------------"
+pip install python-telegram-bot pytz nest-asyncio
 print_status "All Python packages installed"
+
+echo ""
+echo "Langkah 10: Verifikasi instalasi yfinance..."
+echo "----------------------------------------------"
+python -c "import yfinance as yf; print('yfinance version:', yf.__version__)" 2>/dev/null
+if [ $? -eq 0 ]; then
+    print_status "yfinance berhasil diinstall dan dapat diimport"
+else
+    print_error "yfinance gagal diimport, coba langkah berikut:"
+    echo "  1. pip install --upgrade pip setuptools wheel"
+    echo "  2. pip uninstall yfinance -y"
+    echo "  3. pip install yfinance --no-cache-dir"
+fi
 
 echo ""
 echo "=============================================="

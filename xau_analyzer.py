@@ -21,8 +21,10 @@ from pytz import timezone as tz
 
 try:
     import yfinance as yf
-except ImportError:
+except ImportError as e:
     yf = None
+    print(f"Warning: yfinance import failed: {e}")
+    print("Install dengan: pip install yfinance")
 
 logging.basicConfig(
     level=logging.INFO,
