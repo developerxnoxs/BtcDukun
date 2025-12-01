@@ -2,7 +2,7 @@
 """
 XAUUSD (Gold) Technical Analysis Bot
 Tool CLI untuk analisa teknikal Gold/XAUUSD menggunakan Telegram Bot dan Gemini AI Vision
-Menggunakan Finnhub API untuk data historical gold
+Menggunakan Yahoo Finance untuk data historical gold
 """
 
 import logging
@@ -439,7 +439,7 @@ async def handle_timeframe_callback(update: Update, context: ContextTypes.DEFAUL
         await context.bot.edit_message_text(
             chat_id=chat_id,
             message_id=status_message.message_id,
-            text="❌ Gagal mengambil data XAUUSD. Pastikan FINNHUB_API_KEY sudah di-set.\n\n🥇 Pilih timeframe lain:",
+            text="❌ Gagal mengambil data XAUUSD. Coba lagi nanti.\n\n🥇 Pilih timeframe lain:",
             reply_markup=get_timeframe_keyboard()
         )
         return
@@ -565,7 +565,7 @@ async def cmd_analyze(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     data = fetch_xauusd_data(interval)
     if not data or len(data) < 20:
-        await update.message.reply_text("❌ Gagal mengambil data. Pastikan FINNHUB_API_KEY sudah di-set.")
+        await update.message.reply_text("❌ Gagal mengambil data XAUUSD. Coba lagi nanti.")
         return
     
     await update.message.reply_text("📊 Generating chart...")
@@ -610,7 +610,7 @@ async def cmd_price(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
     else:
         await update.message.reply_text(
-            "❌ Gagal mengambil harga gold. Pastikan FINNHUB_API_KEY sudah di-set."
+            "❌ Gagal mengambil harga gold. Coba lagi nanti."
         )
 
 
@@ -634,7 +634,7 @@ async def cmd_help(update: Update, context: ContextTypes.DEFAULT_TYPE):
 • Entry, TP, dan SL recommendation
 
 *API yang digunakan:*
-• Finnhub - XAUUSD historical candlestick data
+• Yahoo Finance - XAUUSD historical candlestick data
 • Google Gemini Vision - AI Analysis
 
 ⚠️ *Disclaimer:* Bot ini hanya untuk edukasi. Bukan financial advice."""
