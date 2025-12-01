@@ -14,6 +14,7 @@ import sys
 import requests
 import mplfinance as mpf
 import pandas as pd
+import time
 from datetime import datetime, timezone, timedelta
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.ext import Application, CommandHandler, CallbackQueryHandler, ContextTypes
@@ -68,19 +69,29 @@ def fetch_xauusd_data(interval="1hour"):
     df = None
     
     for symbol in symbols:
-        try:
-            logger.info(f"Mengambil data {symbol} interval {interval}...")
-            
-            df = yf.download(symbol, period=period, interval=yf_interval, progress=False)
-            
-            if df is not None and not df.empty:
-                logger.info(f"Berhasil mendapat data dari {symbol}")
-                break
-            else:
-                logger.warning(f"Tidak ada data dari {symbol}, mencoba symbol lain...")
-        except Exception as e:
-            logger.warning(f"Gagal mengambil data {symbol}: {e}")
-            continue
+        for attempt in range(3):
+            try:
+                logger.info(f"Mengambil data {symbol} (attempt {attempt+1}/3) interval {interval}...")
+                
+                df = yf.download(symbol, period=period, interval=yf_interval, progress=False)
+                
+                if df is not None and not df.empty:
+                    logger.info(f"Berhasil mendapat data dari {symbol}")
+                    break
+                else:
+                    logger.warning(f"Tidak ada data dari {symbol}, mencoba lagi...")
+                    if attempt < 2:
+                        time.sleep(3)
+            except Exception as e:
+                logger.warning(f"Attempt {attempt+1} - Gagal mengambil {symbol}: {e}")
+                if attempt < 2:
+                    wait_time = 5 + (attempt * 5)
+                    logger.info(f"Waiting {wait_time}s sebelum retry...")
+                    time.sleep(wait_time)
+                continue
+        
+        if df is not None and not df.empty:
+            break
     
     if df is None or df.empty:
         logger.error("Semua symbol gagal, tidak ada data XAUUSD")
@@ -137,13 +148,16 @@ def get_current_gold_price():
     symbols = ["GC=F", "GLD", "IAU"]
     
     for symbol in symbols:
-        try:
-            df = yf.download(symbol, period="1d", interval="1m", progress=False)
-            if df is not None and not df.empty:
-                return float(df.iloc[-1]["Close"])
-        except Exception as e:
-            logger.warning(f"Error getting price from {symbol}: {e}")
-            continue
+        for attempt in range(3):
+            try:
+                df = yf.download(symbol, period="1d", interval="1m", progress=False)
+                if df is not None and not df.empty:
+                    return float(df.iloc[-1]["Close"])
+            except Exception as e:
+                logger.warning(f"Attempt {attempt+1} - Error getting price from {symbol}: {e}")
+                if attempt < 2:
+                    time.sleep(3)
+                continue
     
     return None
 

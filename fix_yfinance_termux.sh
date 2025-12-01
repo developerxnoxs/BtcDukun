@@ -64,9 +64,9 @@ pip install pandas --no-build-isolation --no-cache-dir
 print_status "pandas installed"
 
 echo ""
-echo "Langkah 5: Install yfinance versi 0.2.40 (tanpa curl-cffi)..."
-pip install yfinance==0.2.40 --no-cache-dir
-print_status "yfinance 0.2.40 installed (compatible dengan Termux)"
+echo "Langkah 5: Install yfinance versi 0.2.54+ (dengan fix rate limit)..."
+pip install yfinance>=0.2.54 --no-cache-dir
+print_status "yfinance 0.2.54+ installed (fix untuk JSONDecodeError)"
 
 echo ""
 echo "Langkah 7: Verifikasi..."
