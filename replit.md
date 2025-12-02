@@ -10,9 +10,10 @@ Preferred communication style: Simple, everyday language.
 
 ## Bot Architecture
 
-The system implements two independent Telegram bot instances:
-- **Crypto Bot** (`btc_analyzer.py`): Handles cryptocurrency technical analysis
-- **Forex/Commodities Bot** (`xau_analyzer.py`): Handles forex pairs and precious metals analysis
+The system implements three Telegram bot options:
+- **Crypto Bot** (`btc_analyzer.py`): Handles cryptocurrency technical analysis only
+- **Forex/Commodities Bot** (`xau_analyzer.py`): Handles forex pairs and precious metals analysis only
+- **Combined Bot** (`combined_analyzer.py`): All-in-one bot with menu to choose between Crypto and Forex markets
 
 Each bot operates as a standalone Python application using the python-telegram-bot library with an async/await pattern for handling user interactions.
 
@@ -60,8 +61,9 @@ The callback query handler pattern enables stateful navigation without requiring
 ## Configuration Management
 
 Environment-based configuration for sensitive credentials:
-- `TELEGRAM_BOT_TOKEN` - Main crypto bot authentication
+- `TELEGRAM_BOT_TOKEN` - Crypto bot authentication
 - `TELEGRAM_BOT_TOKEN_XAU` - Forex/commodities bot authentication  
+- `TELEGRAM_BOT_TOKEN_COMBINED` - Combined bot authentication
 - `GEMINI_API_KEY` - AI vision API authentication
 
 This approach keeps secrets out of code and allows for environment-specific deployments.
