@@ -12,6 +12,6 @@ dependencies = [
     "pytz>=2025.2",
     "requests>=2.32.5",
     "websocket-client>=1.9.0",
-    "xnoxs-fetcher>=3.0.0",
+    "xnoxs-fetcher>=4.0.0",
     "yfinance>=0.2.66",
 ]
