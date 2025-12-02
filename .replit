@@ -52,4 +52,4 @@ author = 50543629
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "uv run python combine_analyzer.py"
+args = "uv run python combined_analyzer.py"
