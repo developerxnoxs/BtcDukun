@@ -22,11 +22,11 @@ Each bot operates as a standalone Python application using the python-telegram-b
 Both bots now use a unified fallback mechanism for market data retrieval:
 
 ### Forex/Commodities Bot (xau_analyzer.py):
-1. **Primary Source**: TradingView DataFeed (`tvDatafeed`) - Exchanges: OANDA, FXCM, FX_IDC, FOREXCOM, CAPITALCOM
+1. **Primary Source**: TradingView DataFeed (`xnoxs-fetcher`) - Exchanges: OANDA, FXCM, FX_IDC, FOREXCOM, CAPITALCOM
 2. **Fallback Source**: Yahoo Finance (`yfinance`) - Used when TradingView is unavailable
 
 ### Crypto Bot (btc_analyzer.py):
-1. **Primary Source**: TradingView DataFeed (`tvDatafeed`) - Exchanges: BINANCE, BYBIT, COINBASE, KRAKEN, BITSTAMP
+1. **Primary Source**: TradingView DataFeed (`xnoxs-fetcher`) - Exchanges: BINANCE, BYBIT, COINBASE, KRAKEN, BITSTAMP
 2. **Secondary Fallback**: Yahoo Finance (`yfinance`) - Used when TradingView is unavailable
 3. **Tertiary Fallback**: KuCoin API - Used when both TradingView and Yahoo Finance fail
 
@@ -80,12 +80,13 @@ This approach keeps secrets out of code and allows for environment-specific depl
 ## Python Libraries
 
 - **python-telegram-bot**: Telegram bot framework with async support
-- **tvDatafeed**: TradingView data connector
+- **xnoxs-fetcher**: TradingView data connector (replacement for tvDatafeed)
 - **yfinance**: Yahoo Finance data connector
 - **mplfinance**: Financial charting and candlestick visualization
 - **pandas**: Data manipulation and time-series handling
 - **requests**: HTTP client for API calls
 - **pytz**: Timezone handling for global market hours
+- **websocket-client**: WebSocket support for xnoxs-fetcher
 
 ## Runtime Environment
 

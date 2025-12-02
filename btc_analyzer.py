@@ -24,9 +24,29 @@ try:
     from xnoxs_fetcher import XnoxsFetcher, TimeFrame
     fetcher = XnoxsFetcher()
     TV_AVAILABLE = True
+    TV_INTERVAL_MAP = {
+        "1min": TimeFrame.MINUTE_1,
+        "5min": TimeFrame.MINUTE_5,
+        "15min": TimeFrame.MINUTE_15,
+        "30min": TimeFrame.MINUTE_30,
+        "1hour": TimeFrame.HOUR_1,
+        "4hour": TimeFrame.HOUR_4,
+        "1day": TimeFrame.DAILY,
+        "1week": TimeFrame.WEEKLY,
+    }
 except ImportError:
     TV_AVAILABLE = False
     fetcher = None
+    TV_INTERVAL_MAP = {
+        "1min": None,
+        "5min": None,
+        "15min": None,
+        "30min": None,
+        "1hour": None,
+        "4hour": None,
+        "1day": None,
+        "1week": None,
+    }
 
 try:
     import yfinance as yf
@@ -70,17 +90,6 @@ KUCOIN_INTERVAL_MAP = {
     "30min": 1800, "1hour": 3600, "2hour": 7200,
     "4hour": 14400, "6hour": 21600, "8hour": 28800,
     "12hour": 43200, "1day": 86400, "1week": 604800
-}
-
-TV_INTERVAL_MAP = {
-    "1min": TimeFrame.MINUTE_1 if TV_AVAILABLE else None,
-    "5min": TimeFrame.MINUTE_5 if TV_AVAILABLE else None,
-    "15min": TimeFrame.MINUTE_15 if TV_AVAILABLE else None,
-    "30min": TimeFrame.MINUTE_30 if TV_AVAILABLE else None,
-    "1hour": TimeFrame.HOUR_1 if TV_AVAILABLE else None,
-    "4hour": TimeFrame.HOUR_4 if TV_AVAILABLE else None,
-    "1day": TimeFrame.DAILY if TV_AVAILABLE else None,
-    "1week": TimeFrame.WEEKLY if TV_AVAILABLE else None,
 }
 
 

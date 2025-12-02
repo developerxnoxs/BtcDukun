@@ -26,12 +26,24 @@ TV_AVAILABLE = False
 YF_AVAILABLE = False
 
 try:
-    from tvDatafeed import TvDatafeed, Interval
+    from xnoxs_fetcher import XnoxsFetcher, TimeFrame
     TV_AVAILABLE = True
-    tv = TvDatafeed()
-    logging.info("TradingView DataFeed tersedia")
+    fetcher = XnoxsFetcher()
+    TV_INTERVAL_MAP = {
+        "1hour": TimeFrame.HOUR_1,
+        "4hour": TimeFrame.HOUR_4,
+        "1day": TimeFrame.DAILY,
+    }
+    logging.info("XnoxsFetcher (TradingView) tersedia")
 except ImportError:
-    logging.warning("tvDatafeed tidak tersedia")
+    TV_AVAILABLE = False
+    fetcher = None
+    TV_INTERVAL_MAP = {
+        "1hour": None,
+        "4hour": None,
+        "1day": None,
+    }
+    logging.warning("xnoxs-fetcher tidak tersedia")
 
 try:
     import yfinance as yf
@@ -39,12 +51,6 @@ try:
     logging.info("Yahoo Finance tersedia")
 except ImportError:
     logging.warning("yfinance tidak tersedia")
-
-TV_INTERVAL_MAP = {
-    "1hour": Interval.in_1_hour if TV_AVAILABLE else None,
-    "4hour": Interval.in_4_hour if TV_AVAILABLE else None,
-    "1day": Interval.in_daily if TV_AVAILABLE else None,
-}
 
 YF_INTERVAL_MAP = {
     "1hour": "1h",
@@ -110,7 +116,7 @@ def fetch_crypto_from_tradingview(symbol, interval, n_bars=200):
     for exchange in CRYPTO_EXCHANGES:
         try:
             logging.info(f"Mencoba mengambil data {tv_symbol} dari TradingView ({exchange}) interval {interval}...")
-            df = tv.get_hist(symbol=tv_symbol, exchange=exchange, interval=tv_interval, n_bars=n_bars)
+            df = fetcher.get_historical_data(symbol=tv_symbol, exchange=exchange, timeframe=tv_interval, bars=n_bars)
             
             if df is not None and not df.empty:
                 candles = []
@@ -244,7 +250,7 @@ def fetch_forex_from_tradingview(symbol, interval, n_bars=200):
     for exchange in FOREX_EXCHANGES:
         try:
             logging.info(f"Mencoba mengambil data {tv_symbol} dari TradingView ({exchange}) interval {interval}...")
-            df = tv.get_hist(symbol=tv_symbol, exchange=exchange, interval=tv_interval, n_bars=n_bars)
+            df = fetcher.get_historical_data(symbol=tv_symbol, exchange=exchange, timeframe=tv_interval, bars=n_bars)
             
             if df is not None and not df.empty:
                 candles = []

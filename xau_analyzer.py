@@ -20,12 +20,30 @@ from telegram.ext import Application, CommandHandler, CallbackQueryHandler, Cont
 from pytz import timezone as tz
 
 try:
-    from tvDatafeed import TvDatafeed, Interval
-    tv = TvDatafeed()
+    from xnoxs_fetcher import XnoxsFetcher, TimeFrame
+    fetcher = XnoxsFetcher()
     TV_AVAILABLE = True
+    TV_INTERVAL_MAP = {
+        "1min": TimeFrame.MINUTE_1,
+        "5min": TimeFrame.MINUTE_5,
+        "15min": TimeFrame.MINUTE_15,
+        "30min": TimeFrame.MINUTE_30,
+        "1hour": TimeFrame.HOUR_1,
+        "4hour": TimeFrame.HOUR_4,
+        "1day": TimeFrame.DAILY,
+    }
 except ImportError:
     TV_AVAILABLE = False
-    tv = None
+    fetcher = None
+    TV_INTERVAL_MAP = {
+        "1min": None,
+        "5min": None,
+        "15min": None,
+        "30min": None,
+        "1hour": None,
+        "4hour": None,
+        "1day": None,
+    }
 
 try:
     import yfinance as yf
@@ -70,22 +88,12 @@ INTERVAL_MAP = {
     "1day": "1d",
 }
 
-TV_INTERVAL_MAP = {
-    "1min": Interval.in_1_minute if TV_AVAILABLE else None,
-    "5min": Interval.in_5_minute if TV_AVAILABLE else None,
-    "15min": Interval.in_15_minute if TV_AVAILABLE else None,
-    "30min": Interval.in_30_minute if TV_AVAILABLE else None,
-    "1hour": Interval.in_1_hour if TV_AVAILABLE else None,
-    "4hour": Interval.in_4_hour if TV_AVAILABLE else None,
-    "1day": Interval.in_daily if TV_AVAILABLE else None,
-}
-
 
 def fetch_forex_from_tradingview(symbol="XAUUSD", interval="1hour", n_bars=200):
-    """Mengambil data candlestick Forex dari TradingView (untuk pembelajaran)"""
+    """Mengambil data candlestick Forex dari TradingView menggunakan xnoxs-fetcher"""
     
     if not TV_AVAILABLE:
-        logger.error("tvDatafeed library tidak tersedia")
+        logger.error("xnoxs-fetcher library tidak tersedia")
         return None
     
     if interval not in TV_INTERVAL_MAP:
@@ -104,11 +112,11 @@ def fetch_forex_from_tradingview(symbol="XAUUSD", interval="1hour", n_bars=200):
         try:
             logger.info(f"Mencoba mengambil data {symbol} dari TradingView ({exchange}) interval {interval}...")
             
-            df = tv.get_hist(
+            df = fetcher.get_historical_data(
                 symbol=symbol,
                 exchange=exchange,
-                interval=tv_interval,
-                n_bars=n_bars
+                timeframe=tv_interval,
+                bars=n_bars
             )
             
             if df is not None and not df.empty:
@@ -240,11 +248,11 @@ def get_current_price(symbol="XAUUSD"):
     
     if TV_AVAILABLE:
         try:
-            df = tv.get_hist(
+            df = fetcher.get_historical_data(
                 symbol=symbol,
                 exchange='OANDA',
-                interval=Interval.in_1_minute,
-                n_bars=1
+                timeframe=TimeFrame.MINUTE_1,
+                bars=1
             )
             if df is not None and not df.empty:
                 return float(df.iloc[-1]["close"])
