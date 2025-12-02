@@ -44,3 +44,12 @@ args = "uv run python xau_analyzer.py"
 
 [workflows.workflow.metadata]
 outputType = "console"
+
+[[workflows.workflow]]
+name = "combine"
+mode = "sequential"
+author = 50543629
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "uv run python combine_analyzer.py"
