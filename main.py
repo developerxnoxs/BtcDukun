@@ -19,6 +19,9 @@ from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.ext import Application, CommandHandler, CallbackQueryHandler, ContextTypes
 from pytz import timezone as tz
 import asyncio
+from dotenv import load_dotenv
+
+load_dotenv()
 
 try:
     from xnoxs_fetcher import XnoxsFetcher, TimeFrame

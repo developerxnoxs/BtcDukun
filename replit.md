@@ -55,12 +55,24 @@ Layout profesional 4-panel dengan rasio 6:2:2:2:
 3. Indikator RSI
 4. Indikator MACD
 
-## Environment Variables
+## Konfigurasi Environment
+
+Bot mengambil konfigurasi dari file `.env` atau environment variables.
+
+**Cara Setup:**
+1. Salin `.env.example` ke `.env`
+2. Isi dengan nilai yang benar
 
 | Variable | Deskripsi |
 |----------|-----------|
-| `TELEGRAM_BOT_TOKEN` | Token bot Telegram |
-| `GEMINI_API_KEY` | Google Gemini API key |
+| `TELEGRAM_BOT_TOKEN` | Token bot Telegram (dari @BotFather) |
+| `GEMINI_API_KEY` | Google Gemini API key (dari Google AI Studio) |
+
+**Contoh file .env:**
+```
+TELEGRAM_BOT_TOKEN=1234567890:ABCdefGhIjKlMnOpQrStUvWxYz
+GEMINI_API_KEY=AIzaSyxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+```
 
 ## Workflow
 
