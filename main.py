@@ -1105,16 +1105,12 @@ def generate_chart(data, filename="chart.png", symbol="BTC", tf="15min", market_
         ]
 
         if market_type == "crypto":
-            title = f"\n{symbol}/USDT ({tf}) - Analisa Teknikal Pro"
             ylabel = "Harga (USDT)"
         else:
-            pair_info = FOREX_PAIRS.get(symbol, {"name": symbol})
-            title = f"\n{symbol} - {pair_info['name']} ({tf}) - Analisa Teknikal Pro"
             ylabel = "Harga"
 
         mpf.plot(
             df, type='candle', volume=True, style=style,
-            title=title,
             ylabel=ylabel,
             ylabel_lower="Volume",
             savefig=dict(fname=filename, dpi=150, bbox_inches='tight'),
