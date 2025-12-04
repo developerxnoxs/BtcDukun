@@ -1527,16 +1527,31 @@ def extract_signal_from_analysis(text):
     text_upper = text.upper()
     
     signal_patterns = [
-        (r'SINYAL[:\s]*\[?(STRONG[\s_]?BUY)\]?', 'STRONG_BUY'),
-        (r'SINYAL[:\s]*\[?(STRONG[\s_]?SELL)\]?', 'STRONG_SELL'),
-        (r'SINYAL[:\s]*\[?(BUY)\]?', 'BUY'),
-        (r'SINYAL[:\s]*\[?(SELL)\]?', 'SELL'),
-        (r'SINYAL[:\s]*\[?(HOLD)\]?', 'HOLD'),
-        (r'SIGNAL[:\s]*\[?(STRONG[\s_]?BUY)\]?', 'STRONG_BUY'),
-        (r'SIGNAL[:\s]*\[?(STRONG[\s_]?SELL)\]?', 'STRONG_SELL'),
-        (r'SIGNAL[:\s]*\[?(BUY)\]?', 'BUY'),
-        (r'SIGNAL[:\s]*\[?(SELL)\]?', 'SELL'),
-        (r'SIGNAL[:\s]*\[?(HOLD)\]?', 'HOLD'),
+        (r'SINYAL[:\s]*\*?\[?(STRONG[\s_]?BUY)\]?\*?', 'STRONG_BUY'),
+        (r'SINYAL[:\s]*\*?\[?(STRONG[\s_]?SELL)\]?\*?', 'STRONG_SELL'),
+        (r'SINYAL[:\s]*\*?\[?(BUY)\]?\*?', 'BUY'),
+        (r'SINYAL[:\s]*\*?\[?(SELL)\]?\*?', 'SELL'),
+        (r'SINYAL[:\s]*\*?\[?(HOLD|NETRAL|NEUTRAL)\]?\*?', 'HOLD'),
+        (r'SIGNAL[:\s]*\*?\[?(STRONG[\s_]?BUY)\]?\*?', 'STRONG_BUY'),
+        (r'SIGNAL[:\s]*\*?\[?(STRONG[\s_]?SELL)\]?\*?', 'STRONG_SELL'),
+        (r'SIGNAL[:\s]*\*?\[?(BUY)\]?\*?', 'BUY'),
+        (r'SIGNAL[:\s]*\*?\[?(SELL)\]?\*?', 'SELL'),
+        (r'SIGNAL[:\s]*\*?\[?(HOLD|NETRAL|NEUTRAL)\]?\*?', 'HOLD'),
+        (r'\[STRONG[\s_]?BUY\]', 'STRONG_BUY'),
+        (r'\[STRONG[\s_]?SELL\]', 'STRONG_SELL'),
+        (r'\[BUY\]', 'BUY'),
+        (r'\[SELL\]', 'SELL'),
+        (r'\[HOLD\]', 'HOLD'),
+        (r'REKOMENDASI[:\s]*\*?(STRONG[\s_]?BUY)\*?', 'STRONG_BUY'),
+        (r'REKOMENDASI[:\s]*\*?(STRONG[\s_]?SELL)\*?', 'STRONG_SELL'),
+        (r'REKOMENDASI[:\s]*\*?(BUY|BELI)\*?', 'BUY'),
+        (r'REKOMENDASI[:\s]*\*?(SELL|JUAL)\*?', 'SELL'),
+        (r'REKOMENDASI[:\s]*\*?(HOLD|TAHAN|NETRAL)\*?', 'HOLD'),
+        (r'AKSI[:\s]*\*?(STRONG[\s_]?BUY)\*?', 'STRONG_BUY'),
+        (r'AKSI[:\s]*\*?(STRONG[\s_]?SELL)\*?', 'STRONG_SELL'),
+        (r'AKSI[:\s]*\*?(BUY|BELI)\*?', 'BUY'),
+        (r'AKSI[:\s]*\*?(SELL|JUAL)\*?', 'SELL'),
+        (r'AKSI[:\s]*\*?(HOLD|TAHAN)\*?', 'HOLD'),
     ]
     
     for pattern, signal in signal_patterns:
@@ -1551,8 +1566,21 @@ def extract_signal_from_analysis(text):
             }.get(signal, "⚪")
             
             signal_display = signal.replace("_", " ")
+            log_info(f"Signal ditemukan: {signal} dari pattern: {pattern}")
             return signal, f"{signal_emoji} Sinyal AI: {signal_display}"
     
+    if "STRONG BUY" in text_upper or "STRONG_BUY" in text_upper:
+        return "STRONG_BUY", "🟢🟢 Sinyal AI: STRONG BUY"
+    elif "STRONG SELL" in text_upper or "STRONG_SELL" in text_upper:
+        return "STRONG_SELL", "🔴🔴 Sinyal AI: STRONG SELL"
+    elif "BUY" in text_upper or "BELI" in text_upper:
+        return "BUY", "🟢 Sinyal AI: BUY"
+    elif "SELL" in text_upper or "JUAL" in text_upper:
+        return "SELL", "🔴 Sinyal AI: SELL"
+    elif "HOLD" in text_upper or "TAHAN" in text_upper or "NETRAL" in text_upper:
+        return "HOLD", "🟡 Sinyal AI: HOLD"
+    
+    log_warning(f"Tidak dapat menemukan sinyal dalam analisa. Text (100 karakter pertama): {text[:100]}")
     return None, None
 
 
