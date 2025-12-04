@@ -2031,20 +2031,22 @@ async def handle_timeframe_callback(update: Update, context: ContextTypes.DEFAUL
     
     signal_code, signal_text = extract_signal_from_analysis(analysis)
     
-    if signal_text:
-        try:
-            if market_type == "crypto":
-                new_caption = f"{info['emoji']} {symbol}/USDT ({interval})\n{signal_text}"
-            else:
-                new_caption = f"{info['emoji']} {symbol} - {info['name']} ({interval})\n{signal_text}"
-            
-            await context.bot.edit_message_caption(
-                chat_id=chat_id,
-                message_id=photo_message.message_id,
-                caption=new_caption
-            )
-        except Exception as e:
-            logger.warning(f"Gagal update caption chart: {e}")
+    if not signal_text:
+        signal_text = "✅ Analisa selesai"
+    
+    try:
+        if market_type == "crypto":
+            new_caption = f"{info['emoji']} {symbol}/USDT ({interval})\n{signal_text}"
+        else:
+            new_caption = f"{info['emoji']} {symbol} - {info['name']} ({interval})\n{signal_text}"
+        
+        await context.bot.edit_message_caption(
+            chat_id=chat_id,
+            message_id=photo_message.message_id,
+            caption=new_caption
+        )
+    except Exception as e:
+        logger.warning(f"Gagal update caption chart: {e}")
     
     if market_type == "crypto":
         result_text = f"""{info['emoji']} *Hasil Analisa {symbol}/USDT ({interval})*
@@ -2184,20 +2186,22 @@ async def cmd_analyze(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     signal_code, signal_text = extract_signal_from_analysis(analysis)
     
-    if signal_text:
-        try:
-            if market_type == "crypto":
-                new_caption = f"{info['emoji']} {symbol}/USDT ({interval})\n{signal_text}"
-            else:
-                new_caption = f"{info['emoji']} {symbol} ({interval})\n{signal_text}"
-            
-            await context.bot.edit_message_caption(
-                chat_id=update.message.chat.id,
-                message_id=photo_msg.message_id,
-                caption=new_caption
-            )
-        except Exception as e:
-            logger.warning(f"Gagal update caption chart: {e}")
+    if not signal_text:
+        signal_text = "✅ Analisa selesai"
+    
+    try:
+        if market_type == "crypto":
+            new_caption = f"{info['emoji']} {symbol}/USDT ({interval})\n{signal_text}"
+        else:
+            new_caption = f"{info['emoji']} {symbol} ({interval})\n{signal_text}"
+        
+        await context.bot.edit_message_caption(
+            chat_id=update.message.chat.id,
+            message_id=photo_msg.message_id,
+            caption=new_caption
+        )
+    except Exception as e:
+        logger.warning(f"Gagal update caption chart: {e}")
     
     await update.message.reply_text(
         f"{info['emoji']} Hasil Analisa Pro {symbol} ({interval}):\n\n{formatted}\n\n"
