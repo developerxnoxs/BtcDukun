@@ -169,6 +169,26 @@ GEMINI_API_KEY=AIzaSyxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 
 ## Perubahan Terbaru
 
+- 2024-12-04: **v3.2 - TradingView Candle Sync**
+  - Menambahkan sinkronisasi waktu verifikasi dengan jadwal candle close TradingView (UTC)
+  - Fungsi baru: `calculate_next_candle_close()` untuk menghitung waktu candle close berikutnya
+  - Fungsi baru: `calculate_sync_delay()` untuk menghitung delay hingga candle close + buffer
+  - Fungsi baru: `format_sync_time_info()` untuk format informasi waktu sinkronisasi
+  - Job verifikasi sekarang dijadwalkan tepat saat candle ditutup di TradingView
+  - Jadwal candle close sesuai TradingView:
+    - 1min: Setiap menit pada :00 detik
+    - 5min: :00, :05, :10, :15, :20, :25, :30, :35, :40, :45, :50, :55
+    - 15min: :00, :15, :30, :45
+    - 30min: :00, :30
+    - 1hour: Setiap jam pada :00 menit
+    - 4hour: 00:00, 04:00, 08:00, 12:00, 16:00, 20:00 UTC
+    - 1day: 00:00 UTC
+    - 1week: 00:00 UTC hari Senin
+  - Buffer 5 detik ditambahkan untuk memastikan data candle tersedia
+  - Notifikasi penjadwalan menampilkan waktu candle close (WIB & UTC)
+  - Pesan verifikasi menampilkan waktu verifikasi yang tersinkronisasi
+  - Logging detail untuk debugging sinkronisasi waktu
+
 - 2024-12-04: **v3.1 - Signal Consistency Fix**
   - Memperbaiki masalah sinyal yang tidak konsisten antara caption chart dan analisa Gemini
   - Caption chart sekarang menampilkan "Menganalisa dengan AI..." saat proses analisa

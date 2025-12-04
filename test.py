@@ -39,6 +39,163 @@ TIMEFRAME_SECONDS = {
     "1week": 604800
 }
 
+CANDLE_SYNC_BUFFER = 5
+
+def calculate_next_candle_close(interval: str, current_time: datetime = None) -> datetime:
+    """
+    Menghitung waktu penutupan candle berikutnya sesuai jadwal TradingView (UTC)
+    TradingView menggunakan UTC untuk crypto (24/7 markets)
+    
+    Jadwal penutupan candle:
+    - 1min: Setiap menit pada :00 detik
+    - 5min: :00, :05, :10, :15, :20, :25, :30, :35, :40, :45, :50, :55
+    - 15min: :00, :15, :30, :45
+    - 30min: :00, :30
+    - 1hour: Setiap jam pada :00 menit
+    - 4hour: 00:00, 04:00, 08:00, 12:00, 16:00, 20:00 UTC
+    - 1day: 00:00 UTC
+    - 1week: 00:00 UTC hari Senin
+    """
+    if current_time is None:
+        current_time = datetime.now(timezone.utc)
+    elif current_time.tzinfo is None:
+        current_time = current_time.replace(tzinfo=timezone.utc)
+    else:
+        current_time = current_time.astimezone(timezone.utc)
+    
+    interval_seconds = TIMEFRAME_SECONDS.get(interval, 60)
+    
+    if interval == "1week":
+        current_weekday = current_time.weekday()
+        
+        if current_weekday == 0:
+            if current_time.hour == 0 and current_time.minute == 0 and current_time.second == 0:
+                days_until_monday = 7
+            else:
+                days_until_monday = 7
+        else:
+            days_until_monday = (7 - current_weekday) % 7
+            if days_until_monday == 0:
+                days_until_monday = 7
+        
+        next_close = current_time.replace(hour=0, minute=0, second=0, microsecond=0)
+        next_close += timedelta(days=days_until_monday)
+        
+        if next_close <= current_time:
+            next_close += timedelta(days=7)
+        
+    elif interval == "1day":
+        next_close = current_time.replace(hour=0, minute=0, second=0, microsecond=0)
+        next_close += timedelta(days=1)
+        
+        if next_close <= current_time:
+            next_close += timedelta(days=1)
+        
+    elif interval == "4hour":
+        current_hour = current_time.hour
+        next_4h_slot = ((current_hour // 4) + 1) * 4
+        
+        if next_4h_slot >= 24:
+            next_close = current_time.replace(hour=0, minute=0, second=0, microsecond=0)
+            next_close += timedelta(days=1)
+        else:
+            next_close = current_time.replace(hour=next_4h_slot, minute=0, second=0, microsecond=0)
+            
+    elif interval == "1hour":
+        next_close = current_time.replace(minute=0, second=0, microsecond=0)
+        next_close += timedelta(hours=1)
+        
+    elif interval == "30min":
+        current_minute = current_time.minute
+        if current_minute < 30:
+            next_close = current_time.replace(minute=30, second=0, microsecond=0)
+        else:
+            next_close = current_time.replace(minute=0, second=0, microsecond=0)
+            next_close += timedelta(hours=1)
+            
+    elif interval == "15min":
+        current_minute = current_time.minute
+        next_15_slot = ((current_minute // 15) + 1) * 15
+        
+        if next_15_slot >= 60:
+            next_close = current_time.replace(minute=0, second=0, microsecond=0)
+            next_close += timedelta(hours=1)
+        else:
+            next_close = current_time.replace(minute=next_15_slot, second=0, microsecond=0)
+            
+    elif interval == "5min":
+        current_minute = current_time.minute
+        next_5_slot = ((current_minute // 5) + 1) * 5
+        
+        if next_5_slot >= 60:
+            next_close = current_time.replace(minute=0, second=0, microsecond=0)
+            next_close += timedelta(hours=1)
+        else:
+            next_close = current_time.replace(minute=next_5_slot, second=0, microsecond=0)
+            
+    else:
+        next_close = current_time.replace(second=0, microsecond=0)
+        next_close += timedelta(minutes=1)
+    
+    return next_close
+
+
+def calculate_sync_delay(interval: str, buffer_seconds: int = None) -> tuple:
+    """
+    Menghitung delay hingga candle close berikutnya + buffer untuk sinkronisasi TradingView
+    
+    Returns:
+        tuple: (delay_seconds, next_close_time_utc, next_close_time_wib)
+    """
+    if buffer_seconds is None:
+        buffer_seconds = CANDLE_SYNC_BUFFER
+    
+    current_time = datetime.now(timezone.utc)
+    next_close = calculate_next_candle_close(interval, current_time)
+    
+    delay = (next_close - current_time).total_seconds() + buffer_seconds
+    
+    if delay < buffer_seconds:
+        next_close = calculate_next_candle_close(interval, next_close + timedelta(seconds=1))
+        delay = (next_close - current_time).total_seconds() + buffer_seconds
+    
+    wib = tz("Asia/Jakarta")
+    next_close_wib = next_close.astimezone(wib)
+    
+    return (int(delay), next_close, next_close_wib)
+
+
+def format_sync_time_info(interval: str) -> dict:
+    """
+    Format informasi waktu sinkronisasi untuk ditampilkan ke user
+    
+    Returns:
+        dict dengan keys: delay_seconds, next_close_utc, next_close_wib, formatted_wib, formatted_utc
+    """
+    delay, next_close_utc, next_close_wib = calculate_sync_delay(interval)
+    
+    minutes = delay // 60
+    seconds = delay % 60
+    
+    if minutes > 60:
+        hours = minutes // 60
+        remaining_mins = minutes % 60
+        delay_formatted = f"{hours} jam {remaining_mins} menit"
+    elif minutes > 0:
+        delay_formatted = f"{minutes} menit {seconds} detik"
+    else:
+        delay_formatted = f"{seconds} detik"
+    
+    return {
+        "delay_seconds": delay,
+        "delay_formatted": delay_formatted,
+        "next_close_utc": next_close_utc,
+        "next_close_wib": next_close_wib,
+        "formatted_wib": next_close_wib.strftime("%H:%M:%S WIB"),
+        "formatted_utc": next_close_utc.strftime("%H:%M:%S UTC")
+    }
+
+
 PIP_VALUES = {
     "XAUUSD": 0.01,
     "XAGUSD": 0.001,
@@ -1663,8 +1820,10 @@ def evaluate_prediction(signal, entry_price, current_price):
 
 
 def save_analysis_to_history(chat_id, symbol, market_type, interval, signal, entry_price, analysis_time):
-    """Menyimpan analisa ke history untuk verifikasi nanti"""
+    """Menyimpan analisa ke history untuk verifikasi nanti (dengan waktu sinkron TradingView)"""
     history_id = f"{chat_id}_{symbol}_{interval}_{int(analysis_time.timestamp())}"
+    
+    sync_info = format_sync_time_info(interval)
     
     analysis_history[history_id] = {
         "chat_id": chat_id,
@@ -1674,22 +1833,31 @@ def save_analysis_to_history(chat_id, symbol, market_type, interval, signal, ent
         "signal": signal,
         "entry_price": entry_price,
         "analysis_time": analysis_time,
-        "check_time": analysis_time + timedelta(seconds=TIMEFRAME_SECONDS.get(interval, 60)),
+        "check_time": sync_info["next_close_wib"],
+        "sync_time_utc": sync_info["formatted_utc"],
+        "sync_time_wib": sync_info["formatted_wib"],
         "verified": False
     }
     
     log_info(f"History disimpan: {history_id} - Signal: {signal}, Entry: {entry_price}")
+    log_info(f"Candle close sync: {sync_info['formatted_wib']} / {sync_info['formatted_utc']}")
     return history_id
 
 
 async def verify_analysis_job(context: ContextTypes.DEFAULT_TYPE):
-    """Job untuk memverifikasi analisa setelah timeframe selesai"""
-    log_info("=== VERIFY JOB STARTED ===")
+    """Job untuk memverifikasi analisa setelah candle close (tersinkronisasi dengan TradingView)"""
+    log_info("=== VERIFY JOB STARTED (TRADINGVIEW SYNC) ===")
     try:
         job_data = context.job.data
         history_id = job_data.get("history_id")
         chat_id_from_job = job_data.get("chat_id")
+        sync_time_utc = job_data.get("sync_time_utc", "N/A")
+        sync_time_wib = job_data.get("sync_time_wib", "N/A")
         
+        current_utc = datetime.now(timezone.utc).strftime("%H:%M:%S UTC")
+        log_info(f"Job executed at: {current_utc}")
+        log_info(f"Expected sync time (UTC): {sync_time_utc}")
+        log_info(f"Expected sync time (WIB): {sync_time_wib}")
         log_info(f"Job data: {job_data}")
         log_info(f"History ID: {history_id}")
         log_info(f"Analysis history keys: {list(analysis_history.keys())}")
@@ -1766,6 +1934,8 @@ async def verify_analysis_job(context: ContextTypes.DEFAULT_TYPE):
         price_change_pct = (price_change / entry_price) * 100 if entry_price > 0 else 0
         change_sign = "+" if price_change >= 0 else ""
         
+        current_wib = datetime.now(tz("Asia/Jakarta")).strftime("%H:%M:%S WIB")
+        
         verification_text = f"""📊 *VERIFIKASI ANALISA - {symbol}*
 ━━━━━━━━━━━━━━━━━━━━
 
@@ -1781,7 +1951,8 @@ async def verify_analysis_job(context: ContextTypes.DEFAULT_TYPE):
 {result_emoji} *Hasil:* {result_color}
 ━━━━━━━━━━━━━━━━━━━━
 
-_Analisa dilakukan {tf_context['name']} yang lalu_"""
+🕐 *Waktu Verifikasi:* {current_wib}
+_Tersinkronisasi dengan candle close TradingView_"""
 
         try:
             await context.bot.send_message(
@@ -2408,8 +2579,17 @@ async def handle_timeframe_callback(update: Update, context: ContextTypes.DEFAUL
                 analysis_time=analysis_time
             )
             
-            delay_seconds = TIMEFRAME_SECONDS.get(interval, 60)
-            log_info(f"Delay seconds: {delay_seconds}")
+            sync_info = format_sync_time_info(interval)
+            delay_seconds = sync_info["delay_seconds"]
+            next_close_wib = sync_info["formatted_wib"]
+            next_close_utc = sync_info["formatted_utc"]
+            delay_formatted = sync_info["delay_formatted"]
+            
+            log_info(f"=== TRADINGVIEW SYNC ===")
+            log_info(f"Interval: {interval}")
+            log_info(f"Next candle close (UTC): {next_close_utc}")
+            log_info(f"Next candle close (WIB): {next_close_wib}")
+            log_info(f"Delay until verification: {delay_seconds} detik ({delay_formatted})")
             
             tf_context = get_timeframe_context(interval)
             
@@ -2419,18 +2599,28 @@ async def handle_timeframe_callback(update: Update, context: ContextTypes.DEFAUL
                     context.job_queue.run_once(
                         verify_analysis_job,
                         when=delay_seconds,
-                        data={"history_id": history_id, "chat_id": chat_id},
+                        data={
+                            "history_id": history_id, 
+                            "chat_id": chat_id,
+                            "sync_time_utc": next_close_utc,
+                            "sync_time_wib": next_close_wib
+                        },
                         name=f"verify_{history_id}",
                         chat_id=chat_id
                     )
-                    log_success(f"Job verifikasi dijadwalkan: {history_id} dalam {delay_seconds} detik")
+                    log_success(f"Job verifikasi dijadwalkan: {history_id} dalam {delay_seconds} detik (sync TradingView)")
                     
                     await context.bot.send_message(
                         chat_id=chat_id,
-                        text=f"⏰ *Verifikasi Otomatis Dijadwalkan*\n\n"
-                             f"Hasil analisa akan diverifikasi dalam *{delay_seconds} detik* ({tf_context['name']}) untuk melihat apakah prediksi Gemini benar atau salah.\n\n"
+                        text=f"⏰ *Verifikasi Otomatis Dijadwalkan*\n"
+                             f"_Tersinkronisasi dengan TradingView_\n\n"
                              f"📊 Entry: ${entry_price:,.4f}\n"
-                             f"🎯 Sinyal: {signal_code.replace('_', ' ')}",
+                             f"🎯 Sinyal: {signal_code.replace('_', ' ')}\n\n"
+                             f"⏳ Verifikasi dalam: *{delay_formatted}*\n"
+                             f"🕐 Waktu candle close:\n"
+                             f"   • {next_close_wib}\n"
+                             f"   • {next_close_utc}\n\n"
+                             f"_Candle {tf_context['name']} akan ditutup, lalu hasil prediksi diverifikasi._",
                         parse_mode='Markdown'
                     )
                 else:
