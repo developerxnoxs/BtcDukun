@@ -1681,9 +1681,17 @@ async def cmd_help(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Handle errors in the bot"""
+    error_str = str(context.error)
+    
+    if "Message is not modified" in error_str:
+        return
+    
+    if "Query is too old" in error_str:
+        return
+    
     logger.error(f"Exception saat menangani update: {context.error}")
     
-    if "Conflict" in str(context.error):
+    if "Conflict" in error_str:
         logger.warning("Konflik bot terdeteksi - mungkin ada instance lain yang berjalan")
 
 
