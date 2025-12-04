@@ -767,6 +767,108 @@ def get_forex_price(symbol="XAUUSD"):
     return None
 
 
+def get_latest_candle_close_crypto(symbol="BTC", interval="1min"):
+    """
+    Mengambil harga close dari candle terbaru yang sudah ditutup untuk crypto
+    Ini memastikan data yang digunakan untuk verifikasi adalah data candle yang sudah final
+    
+    Strategi: Selalu menggunakan candle ke-2 dari terakhir (data[-2]) untuk keamanan
+    karena candle terakhir (data[-1]) mungkin masih forming atau belum sepenuhnya settle
+    """
+    if symbol not in SUPPORTED_COINS:
+        return None, None
+    
+    log_info(f"Fetching latest CLOSED candle for {symbol} ({interval})...")
+    
+    data = fetch_crypto_data(symbol, interval)
+    if not data or len(data) < 3:
+        log_warning(f"Tidak cukup data candle untuk {symbol} - fallback ke real-time price")
+        fallback_price = get_crypto_price(symbol)
+        candle_info = {
+            "close": fallback_price,
+            "time": datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC"),
+            "direction": "N/A",
+            "is_closed": False,
+            "is_fallback": True,
+            "fallback_reason": "Insufficient candle data"
+        }
+        return fallback_price, candle_info
+    
+    closed_candle = data[-2]
+    candle_time = datetime.fromtimestamp(int(closed_candle[0]), tz=timezone.utc)
+    
+    close_price = float(closed_candle[2])
+    open_price = float(closed_candle[1])
+    high_price = float(closed_candle[3])
+    low_price = float(closed_candle[4])
+    
+    candle_info = {
+        "open": open_price,
+        "high": high_price,
+        "low": low_price,
+        "close": close_price,
+        "time": candle_time.strftime("%Y-%m-%d %H:%M:%S UTC"),
+        "direction": "BULLISH" if close_price > open_price else "BEARISH" if close_price < open_price else "DOJI",
+        "is_closed": True,
+        "is_fallback": False
+    }
+    
+    log_info(f"CLOSED candle {symbol} ({interval}): Close=${close_price:,.4f}, Time={candle_info['time']}, Direction={candle_info['direction']}")
+    
+    return close_price, candle_info
+
+
+def get_latest_candle_close_forex(symbol="XAUUSD", interval="1min"):
+    """
+    Mengambil harga close dari candle terbaru yang sudah ditutup untuk forex
+    Ini memastikan data yang digunakan untuk verifikasi adalah data candle yang sudah final
+    
+    Strategi: Selalu menggunakan candle ke-2 dari terakhir (data[-2]) untuk keamanan
+    karena candle terakhir (data[-1]) mungkin masih forming atau belum sepenuhnya settle
+    """
+    if symbol not in FOREX_PAIRS:
+        return None, None
+    
+    log_info(f"Fetching latest CLOSED candle for {symbol} ({interval})...")
+    
+    data = fetch_forex_data(symbol, interval)
+    if not data or len(data) < 3:
+        log_warning(f"Tidak cukup data candle untuk {symbol} - fallback ke real-time price")
+        fallback_price = get_forex_price(symbol)
+        candle_info = {
+            "close": fallback_price,
+            "time": datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC"),
+            "direction": "N/A",
+            "is_closed": False,
+            "is_fallback": True,
+            "fallback_reason": "Insufficient candle data"
+        }
+        return fallback_price, candle_info
+    
+    closed_candle = data[-2]
+    candle_time = datetime.fromtimestamp(int(closed_candle[0]), tz=timezone.utc)
+    
+    close_price = float(closed_candle[2])
+    open_price = float(closed_candle[1])
+    high_price = float(closed_candle[3])
+    low_price = float(closed_candle[4])
+    
+    candle_info = {
+        "open": open_price,
+        "high": high_price,
+        "low": low_price,
+        "close": close_price,
+        "time": candle_time.strftime("%Y-%m-%d %H:%M:%S UTC"),
+        "direction": "BULLISH" if close_price > open_price else "BEARISH" if close_price < open_price else "DOJI",
+        "is_closed": True,
+        "is_fallback": False
+    }
+    
+    log_info(f"CLOSED candle {symbol} ({interval}): Close=${close_price:,.4f}, Time={candle_info['time']}, Direction={candle_info['direction']}")
+    
+    return close_price, candle_info
+
+
 def calculate_rsi(series, period=14):
     """Menghitung RSI (Relative Strength Index)"""
     delta = series.diff()
@@ -1884,12 +1986,34 @@ async def verify_analysis_job(context: ContextTypes.DEFAULT_TYPE):
             record["result_text"] = "DATA_TIDAK_LENGKAP"
             return
         
+        log_info(f"=== FETCHING LATEST CANDLE DATA ===")
+        log_info(f"Symbol: {symbol}, Market: {market_type}, Interval: {interval}")
+        
         if market_type == "crypto":
-            current_price = get_crypto_price(symbol)
+            current_price, candle_info = get_latest_candle_close_crypto(symbol, interval)
             info = SUPPORTED_COINS.get(symbol, {"emoji": "📊", "name": symbol})
         else:
-            current_price = get_forex_price(symbol)
+            current_price, candle_info = get_latest_candle_close_forex(symbol, interval)
             info = FOREX_PAIRS.get(symbol, {"emoji": "📊", "name": symbol})
+        
+        if candle_info:
+            is_fallback = candle_info.get("is_fallback", False)
+            is_closed = candle_info.get("is_closed", False)
+            
+            if is_fallback:
+                log_warning(f"Using FALLBACK real-time price for {symbol}")
+                log_warning(f"  - Reason: {candle_info.get('fallback_reason', 'Unknown')}")
+                log_warning(f"  - Price: ${current_price:,.4f}")
+            else:
+                log_info(f"Candle data retrieved successfully:")
+                log_info(f"  - Close: ${current_price:,.4f}")
+                log_info(f"  - Time: {candle_info['time']}")
+                log_info(f"  - Direction: {candle_info['direction']}")
+                log_info(f"  - Is Closed: {is_closed}")
+                if 'open' in candle_info:
+                    log_info(f"  - OHLC: O=${candle_info['open']:,.4f} H=${candle_info['high']:,.4f} L=${candle_info['low']:,.4f} C=${candle_info['close']:,.4f}")
+        else:
+            log_warning(f"No candle info available for {symbol}")
         
         if not current_price or current_price <= 0:
             log_error(f"Gagal mendapatkan harga terbaru untuk {symbol}")
@@ -1911,6 +2035,7 @@ async def verify_analysis_job(context: ContextTypes.DEFAULT_TYPE):
         record["pips"] = pips
         record["is_correct"] = is_correct
         record["result_text"] = result_text
+        record["candle_info"] = candle_info
         
         if pips >= 0:
             pip_display = f"+{pips:.1f} pip"
@@ -1936,6 +2061,22 @@ async def verify_analysis_job(context: ContextTypes.DEFAULT_TYPE):
         
         current_wib = datetime.now(tz("Asia/Jakarta")).strftime("%H:%M:%S WIB")
         
+        candle_direction = ""
+        candle_time_str = ""
+        is_fallback = candle_info.get("is_fallback", False) if candle_info else True
+        
+        if candle_info and not is_fallback:
+            candle_direction = candle_info.get("direction", "")
+            candle_time_str = candle_info.get("time", "")
+            direction_emoji = "🟢" if candle_direction == "BULLISH" else "🔴" if candle_direction == "BEARISH" else "⚪"
+            candle_detail = f"\n🕯️ *Candle {tf_context['name']}:* {direction_emoji} {candle_direction}\n📅 *Waktu Candle:* {candle_time_str}"
+            price_label = "Harga Close Candle"
+            data_source = "_Data candle dari TradingView (tersinkronisasi)_"
+        else:
+            candle_detail = "\n⚠️ _Menggunakan harga real-time (data candle tidak tersedia)_"
+            price_label = "Harga Real-time"
+            data_source = "_Harga real-time (fallback)_"
+        
         verification_text = f"""📊 *VERIFIKASI ANALISA - {symbol}*
 ━━━━━━━━━━━━━━━━━━━━
 
@@ -1943,8 +2084,9 @@ async def verify_analysis_job(context: ContextTypes.DEFAULT_TYPE):
 
 *Prediksi Gemini:* {signal_display}
 *Harga Entry:* ${entry_price:,.4f}
-*Harga Sekarang:* ${current_price:,.4f}
+*{price_label}:* ${current_price:,.4f}
 *Perubahan:* {change_sign}${price_change:,.4f} ({change_sign}{price_change_pct:.2f}%)
+{candle_detail}
 
 ━━━━━━━━━━━━━━━━━━━━
 {pip_emoji} *Pergerakan:* {pip_display}
@@ -1952,7 +2094,7 @@ async def verify_analysis_job(context: ContextTypes.DEFAULT_TYPE):
 ━━━━━━━━━━━━━━━━━━━━
 
 🕐 *Waktu Verifikasi:* {current_wib}
-_Tersinkronisasi dengan candle close TradingView_"""
+{data_source}"""
 
         try:
             await context.bot.send_message(
