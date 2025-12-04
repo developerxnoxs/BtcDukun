@@ -1780,6 +1780,9 @@ def get_after_analysis_keyboard(symbol, market_type):
 
 async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Handler untuk command /start"""
+    if not update.message:
+        return
+    
     welcome_text = """📊 *Bot Analisa Teknikal Pro*
 ━━━━━━━━━━━━━━━━━━━━
 
@@ -1814,6 +1817,8 @@ Selamat datang! Bot ini menyediakan analisa teknikal PROFESSIONAL menggunakan AI
 async def handle_market_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Handler untuk callback pilihan pasar"""
     query = update.callback_query
+    if not query or not query.data:
+        return
     await query.answer()
     
     if query.data == 'market_crypto':
@@ -1845,6 +1850,8 @@ async def handle_market_callback(update: Update, context: ContextTypes.DEFAULT_T
 async def handle_crypto_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Handler untuk callback pilihan crypto"""
     query = update.callback_query
+    if not query or not query.data:
+        return
     await query.answer()
     
     symbol = query.data.replace('crypto_', '')
@@ -1853,8 +1860,9 @@ async def handle_crypto_callback(update: Update, context: ContextTypes.DEFAULT_T
         return
     
     info = SUPPORTED_COINS[symbol]
-    context.user_data['selected_symbol'] = symbol
-    context.user_data['market_type'] = 'crypto'
+    if context.user_data is not None:
+        context.user_data['selected_symbol'] = symbol
+        context.user_data['market_type'] = 'crypto'
     
     current_price = get_crypto_price(symbol)
     price_text = f"💵 Harga saat ini: ${current_price:,.2f}" if current_price else ""
@@ -1869,6 +1877,8 @@ async def handle_crypto_callback(update: Update, context: ContextTypes.DEFAULT_T
 async def handle_forex_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Handler untuk callback pilihan forex"""
     query = update.callback_query
+    if not query or not query.data:
+        return
     await query.answer()
     
     symbol = query.data.replace('forex_', '')
@@ -1877,8 +1887,9 @@ async def handle_forex_callback(update: Update, context: ContextTypes.DEFAULT_TY
         return
     
     info = FOREX_PAIRS[symbol]
-    context.user_data['selected_symbol'] = symbol
-    context.user_data['market_type'] = 'forex'
+    if context.user_data is not None:
+        context.user_data['selected_symbol'] = symbol
+        context.user_data['market_type'] = 'forex'
     
     current_price = get_forex_price(symbol)
     if current_price:
@@ -1899,6 +1910,8 @@ async def handle_forex_callback(update: Update, context: ContextTypes.DEFAULT_TY
 async def handle_timeframe_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Handler untuk callback pilihan timeframe"""
     query = update.callback_query
+    if not query or not query.data or not query.message:
+        return
     await query.answer()
     
     parts = query.data.replace('tf_', '').split('_')
@@ -1925,16 +1938,17 @@ async def handle_timeframe_callback(update: Update, context: ContextTypes.DEFAUL
             return
         info = FOREX_PAIRS[symbol]
     
-    chat_id = query.message.chat_id
+    chat_id = query.message.chat.id
     current_message_id = query.message.message_id
     
+    user_data = context.user_data or {}
     for key in ['last_chart_message_id', 'last_analysis_message_id', 'last_button_message_id']:
-        if key in context.user_data:
+        if key in user_data:
             try:
-                await context.bot.delete_message(chat_id=chat_id, message_id=context.user_data[key])
+                await context.bot.delete_message(chat_id=chat_id, message_id=user_data[key])
             except:
                 pass
-            context.user_data.pop(key, None)
+            user_data.pop(key, None)
     
     status_message = await context.bot.send_message(
         chat_id=chat_id,
@@ -1999,7 +2013,8 @@ async def handle_timeframe_callback(update: Update, context: ContextTypes.DEFAUL
                 photo=photo,
                 caption=caption
             )
-            context.user_data['last_chart_message_id'] = photo_message.message_id
+            if context.user_data is not None:
+                context.user_data['last_chart_message_id'] = photo_message.message_id
     except Exception as e:
         await context.bot.edit_message_text(
             chat_id=chat_id,
@@ -2059,7 +2074,8 @@ async def handle_timeframe_callback(update: Update, context: ContextTypes.DEFAUL
             text=result_text,
             parse_mode='Markdown'
         )
-        context.user_data['last_analysis_message_id'] = status_message.message_id
+        if context.user_data is not None:
+            context.user_data['last_analysis_message_id'] = status_message.message_id
     except:
         await context.bot.edit_message_text(
             chat_id=chat_id,
@@ -2074,14 +2090,16 @@ async def handle_timeframe_callback(update: Update, context: ContextTypes.DEFAUL
             parse_mode='Markdown',
             reply_markup=get_after_analysis_keyboard(symbol, market_type)
         )
-        context.user_data['last_button_message_id'] = button_message.message_id
+        if context.user_data is not None:
+            context.user_data['last_button_message_id'] = button_message.message_id
     except:
         button_message = await context.bot.send_message(
             chat_id=chat_id,
             text="📊 Lanjutkan analisa:",
             reply_markup=get_after_analysis_keyboard(symbol, market_type)
         )
-        context.user_data['last_button_message_id'] = button_message.message_id
+        if context.user_data is not None:
+            context.user_data['last_button_message_id'] = button_message.message_id
     
     try:
         os.remove(chart_path)
@@ -2091,7 +2109,10 @@ async def handle_timeframe_callback(update: Update, context: ContextTypes.DEFAUL
 
 async def cmd_analyze(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Handler untuk command /analyze [symbol] [timeframe]"""
-    args = context.args
+    if not update.message:
+        return
+    
+    args = context.args or []
     
     if len(args) < 2:
         crypto_list = ", ".join(SUPPORTED_COINS.keys())
@@ -2175,7 +2196,7 @@ async def cmd_analyze(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 new_caption = f"{info['emoji']} {symbol} ({interval})\n{signal_text}"
             
             await context.bot.edit_message_caption(
-                chat_id=update.message.chat_id,
+                chat_id=update.message.chat.id,
                 message_id=photo_msg.message_id,
                 caption=new_caption
             )
@@ -2196,7 +2217,10 @@ async def cmd_analyze(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def cmd_price(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Handler untuk command /price [symbol]"""
-    args = context.args
+    if not update.message:
+        return
+    
+    args = context.args or []
     
     if not args:
         await update.message.reply_text(
@@ -2245,6 +2269,9 @@ async def cmd_price(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def cmd_help(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Handler untuk command /help"""
+    if not update.message:
+        return
+    
     crypto_list = ", ".join(SUPPORTED_COINS.keys())
     forex_list = ", ".join(FOREX_PAIRS.keys())
     
