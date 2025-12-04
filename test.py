@@ -1656,9 +1656,15 @@ def save_analysis_to_history(chat_id, symbol, market_type, interval, signal, ent
 
 async def verify_analysis_job(context: ContextTypes.DEFAULT_TYPE):
     """Job untuk memverifikasi analisa setelah timeframe selesai"""
+    log_info("=== VERIFY JOB STARTED ===")
     try:
         job_data = context.job.data
         history_id = job_data.get("history_id")
+        chat_id_from_job = job_data.get("chat_id")
+        
+        log_info(f"Job data: {job_data}")
+        log_info(f"History ID: {history_id}")
+        log_info(f"Analysis history keys: {list(analysis_history.keys())}")
         
         if not history_id or history_id not in analysis_history:
             log_warning(f"History ID tidak ditemukan: {history_id}")
@@ -2342,16 +2348,25 @@ async def handle_timeframe_callback(update: Update, context: ContextTypes.DEFAUL
         if context.user_data is not None:
             context.user_data['last_button_message_id'] = button_message.message_id
     
+    log_info(f"=== DEBUG VERIFIKASI ===")
+    log_info(f"Signal code: {signal_code}")
+    log_info(f"Symbol: {symbol}, Market: {market_type}, Interval: {interval}")
+    
     if signal_code:
         if market_type == "crypto":
             entry_price = get_crypto_price(symbol)
+            log_info(f"Crypto price untuk {symbol}: {entry_price}")
         else:
             entry_price = get_forex_price(symbol)
+            log_info(f"Forex price untuk {symbol}: {entry_price}")
         
         if not entry_price:
             extracted_price = extract_price_from_analysis(analysis)
+            log_info(f"Extracted price dari analisa: {extracted_price}")
             if extracted_price:
                 entry_price = extracted_price
+        
+        log_info(f"Final entry price: {entry_price}")
         
         if entry_price and entry_price > 0:
             analysis_time = datetime.now(tz("Asia/Jakarta"))
@@ -2366,30 +2381,40 @@ async def handle_timeframe_callback(update: Update, context: ContextTypes.DEFAUL
             )
             
             delay_seconds = TIMEFRAME_SECONDS.get(interval, 60)
+            log_info(f"Delay seconds: {delay_seconds}")
             
             tf_context = get_timeframe_context(interval)
             
             try:
+                log_info(f"Job queue tersedia: {context.job_queue is not None}")
                 if context.job_queue:
                     context.job_queue.run_once(
                         verify_analysis_job,
                         when=delay_seconds,
-                        data={"history_id": history_id},
-                        name=f"verify_{history_id}"
+                        data={"history_id": history_id, "chat_id": chat_id},
+                        name=f"verify_{history_id}",
+                        chat_id=chat_id
                     )
+                    log_success(f"Job verifikasi dijadwalkan: {history_id} dalam {delay_seconds} detik")
                     
                     await context.bot.send_message(
                         chat_id=chat_id,
                         text=f"⏰ *Verifikasi Otomatis Dijadwalkan*\n\n"
-                             f"Hasil analisa akan diverifikasi dalam *{tf_context['name']}* untuk melihat apakah prediksi Gemini benar atau salah.\n\n"
+                             f"Hasil analisa akan diverifikasi dalam *{delay_seconds} detik* ({tf_context['name']}) untuk melihat apakah prediksi Gemini benar atau salah.\n\n"
                              f"📊 Entry: ${entry_price:,.4f}\n"
                              f"🎯 Sinyal: {signal_code.replace('_', ' ')}",
                         parse_mode='Markdown'
                     )
+                else:
+                    log_error("Job queue TIDAK tersedia!")
             except Exception as e:
                 log_error(f"Gagal menjadwalkan verifikasi: {e}")
+                import traceback
+                traceback.print_exc()
         else:
             log_warning(f"Tidak dapat mendapatkan harga entry untuk {symbol} - verifikasi tidak dijadwalkan")
+    else:
+        log_warning(f"Signal code kosong/None - verifikasi tidak dijadwalkan")
     
     try:
         os.remove(chart_path)
