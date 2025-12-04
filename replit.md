@@ -55,26 +55,28 @@ Layout profesional 4-panel dengan rasio 6:2:2:2:
 3. Indikator RSI
 4. Indikator MACD
 
-## Analisa Berbasis Timeframe (v2.0)
+## Analisa Berbasis Timeframe (v2.1)
 
-Prompt analisa AI disesuaikan berdasarkan timeframe untuk memberikan target yang lebih realistis:
+Prompt analisa AI disesuaikan berdasarkan timeframe untuk memberikan target yang lebih realistis dan prediksi waktu spesifik:
 
-| Timeframe | Tipe Trading | Target Profit | Stop Loss | Waktu Hold |
-|-----------|--------------|---------------|-----------|------------|
-| 1min | Scalping | 0.1% - 0.3% | 0.05% - 0.15% | 1-15 menit |
-| 5min | Scalping | 0.2% - 0.5% | 0.1% - 0.25% | 5-30 menit |
-| 15min | Intraday | 0.3% - 0.8% | 0.15% - 0.4% | 15 menit - 2 jam |
-| 30min | Intraday | 0.5% - 1.2% | 0.25% - 0.6% | 30 menit - 4 jam |
-| 1hour | Swing Trading | 1% - 2.5% | 0.5% - 1.2% | 2-24 jam |
-| 4hour | Swing Trading | 2% - 5% | 1% - 2.5% | 1-7 hari |
-| 1day | Position Trading | 3% - 10% | 1.5% - 5% | 3-30 hari |
-| 1week | Position/Investment | 5% - 20% | 3% - 10% | 2-12 minggu |
+| Timeframe | Tipe Trading | Target Profit | Stop Loss | Prediksi Waktu |
+|-----------|--------------|---------------|-----------|----------------|
+| 1min | Scalping | 0.1% - 0.3% | 0.05% - 0.15% | 1-5 menit |
+| 5min | Scalping | 0.2% - 0.5% | 0.1% - 0.25% | 5-15 menit |
+| 15min | Intraday | 0.3% - 0.8% | 0.15% - 0.4% | 15-45 menit |
+| 30min | Intraday | 0.5% - 1.2% | 0.25% - 0.6% | 30-90 menit |
+| 1hour | Swing Trading | 1% - 2.5% | 0.5% - 1.2% | 1-4 jam |
+| 4hour | Swing Trading | 2% - 5% | 1% - 2.5% | 4-12 jam |
+| 1day | Position Trading | 3% - 10% | 1.5% - 5% | 1-3 hari |
+| 1week | Position/Investment | 5% - 20% | 3% - 10% | 1-4 minggu |
 
-**Fitur Baru dalam Output Analisa:**
-- PREDIKSI ARAH: Naik/Turun/Sideways dengan tingkat keyakinan
+**Fitur Prediksi Berbasis Waktu:**
+- PREDIKSI X KE DEPAN: Contoh "PREDIKSI 1 MENIT KE DEPAN: NAIK - Keyakinan Tinggi"
+- PERKIRAAN PERGERAKAN: Contoh "Dalam 1-5 menit, harga diperkirakan naik menuju $100,500"
 - RASIO RR: Risk:Reward ratio untuk evaluasi trade
 - WAKTU HOLD: Estimasi durasi berdasarkan timeframe
 - KONFIRMASI: Jumlah indikator yang mendukung sinyal (X dari 5)
+- KESIMPULAN: Menyebutkan arah prediksi spesifik untuk timeframe yang dipilih
 
 ## Konfigurasi Environment
 

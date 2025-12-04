@@ -736,7 +736,9 @@ def get_timeframe_context(interval):
             "hold_time": "1-15 menit",
             "volatility": "sangat tinggi",
             "reliability": "rendah (noise tinggi)",
-            "rr_ratio": "1:1 hingga 1:2"
+            "rr_ratio": "1:1 hingga 1:2",
+            "next_candle": "1 menit ke depan",
+            "prediction_horizon": "1-5 menit"
         },
         "5min": {
             "name": "5 Menit",
@@ -746,7 +748,9 @@ def get_timeframe_context(interval):
             "hold_time": "5-30 menit",
             "volatility": "tinggi",
             "reliability": "rendah-sedang",
-            "rr_ratio": "1:1.5 hingga 1:2"
+            "rr_ratio": "1:1.5 hingga 1:2",
+            "next_candle": "5 menit ke depan",
+            "prediction_horizon": "5-15 menit"
         },
         "15min": {
             "name": "15 Menit",
@@ -756,7 +760,9 @@ def get_timeframe_context(interval):
             "hold_time": "15 menit - 2 jam",
             "volatility": "sedang-tinggi",
             "reliability": "sedang",
-            "rr_ratio": "1:1.5 hingga 1:2.5"
+            "rr_ratio": "1:1.5 hingga 1:2.5",
+            "next_candle": "15 menit ke depan",
+            "prediction_horizon": "15-45 menit"
         },
         "30min": {
             "name": "30 Menit",
@@ -766,7 +772,9 @@ def get_timeframe_context(interval):
             "hold_time": "30 menit - 4 jam",
             "volatility": "sedang",
             "reliability": "sedang-baik",
-            "rr_ratio": "1:2 hingga 1:3"
+            "rr_ratio": "1:2 hingga 1:3",
+            "next_candle": "30 menit ke depan",
+            "prediction_horizon": "30-90 menit"
         },
         "1hour": {
             "name": "1 Jam",
@@ -776,7 +784,9 @@ def get_timeframe_context(interval):
             "hold_time": "2-24 jam",
             "volatility": "sedang",
             "reliability": "baik",
-            "rr_ratio": "1:2 hingga 1:3"
+            "rr_ratio": "1:2 hingga 1:3",
+            "next_candle": "1 jam ke depan",
+            "prediction_horizon": "1-4 jam"
         },
         "4hour": {
             "name": "4 Jam",
@@ -786,7 +796,9 @@ def get_timeframe_context(interval):
             "hold_time": "1-7 hari",
             "volatility": "sedang-rendah",
             "reliability": "baik-sangat baik",
-            "rr_ratio": "1:2 hingga 1:4"
+            "rr_ratio": "1:2 hingga 1:4",
+            "next_candle": "4 jam ke depan",
+            "prediction_horizon": "4-12 jam"
         },
         "1day": {
             "name": "Harian",
@@ -796,7 +808,9 @@ def get_timeframe_context(interval):
             "hold_time": "3-30 hari",
             "volatility": "rendah",
             "reliability": "sangat baik",
-            "rr_ratio": "1:2 hingga 1:5"
+            "rr_ratio": "1:2 hingga 1:5",
+            "next_candle": "1 hari ke depan",
+            "prediction_horizon": "1-3 hari"
         },
         "1week": {
             "name": "Mingguan",
@@ -806,7 +820,9 @@ def get_timeframe_context(interval):
             "hold_time": "2-12 minggu",
             "volatility": "sangat rendah",
             "reliability": "sangat baik (tren utama)",
-            "rr_ratio": "1:2 hingga 1:5"
+            "rr_ratio": "1:2 hingga 1:5",
+            "next_candle": "1 minggu ke depan",
+            "prediction_horizon": "1-4 minggu"
         }
     }
     return timeframe_configs.get(interval, timeframe_configs["1hour"])
@@ -848,6 +864,7 @@ KONTEKS TIMEFRAME {tf_context['name'].upper()}:
 - Volatilitas: {tf_context['volatility']}
 - Keandalan Sinyal: {tf_context['reliability']}
 - Rasio Risk:Reward yang Diharapkan: {tf_context['rr_ratio']}
+- Horizon Prediksi: {tf_context['next_candle']} ({tf_context['prediction_horizon']})
 
 INDIKATOR PADA CHART:
 - EMA 20 (biru) dan EMA 50 (orange) - untuk identifikasi tren
@@ -862,10 +879,12 @@ ATURAN ANALISA:
 3. Jika indikator saling bertentangan, rekomendasikan TAHAN
 4. Gunakan level Fibonacci dan Bollinger Band untuk menentukan target yang realistis
 5. Pastikan rasio Risk:Reward minimal 1:1.5 untuk sinyal BELI/JUAL
+6. Berikan prediksi spesifik untuk {tf_context['next_candle']} berdasarkan momentum saat ini
 
 Berikan analisa dalam format berikut (Bahasa Indonesia):
 
-PREDIKSI ARAH: [NAIK/TURUN/SIDEWAYS] - [Persentase keyakinan: Tinggi/Sedang/Rendah]
+PREDIKSI {tf_context['next_candle'].upper()}: [NAIK/TURUN/SIDEWAYS] - Keyakinan [Tinggi/Sedang/Rendah] - [Alasan singkat berdasarkan indikator]
+PERKIRAAN PERGERAKAN: Dalam {tf_context['prediction_horizon']}, harga diperkirakan [naik/turun/bergerak sideways] menuju [target harga]
 SINYAL: [BELI/JUAL/TAHAN] - [Alasan berdasarkan minimal 2 indikator]
 HARGA SAAT INI: [Harga terakhir yang terlihat di chart]
 HARGA MASUK: [Harga entry optimal]
@@ -873,7 +892,7 @@ TARGET PROFIT 1: [Target pertama - jarak wajar untuk timeframe {tf_context['name
 TARGET PROFIT 2: [Target kedua - lebih ambisius tapi realistis]
 STOP LOSS: [Harga SL berdasarkan support/resistance terdekat]
 RASIO RR: [Risk:Reward ratio, misal 1:2]
-WAKTU HOLD: [Estimasi waktu berdasarkan timeframe]
+WAKTU HOLD: {tf_context['hold_time']}
 POLA: [Pola candlestick yang terlihat]
 TREN: [Tren saat ini berdasarkan EMA: Naik Kuat/Naik Lemah/Turun Kuat/Turun Lemah/Sideways]
 RSI: [Nilai dan kondisi: Overbought(>70)/Netral(30-70)/Oversold(<30)]
@@ -883,9 +902,9 @@ FIBONACCI: [Level Fib terdekat dan signifikansinya]
 SUPPORT: [Level support 1 dan 2]
 RESISTANCE: [Level resistance 1 dan 2]
 KONFIRMASI: [Berapa indikator yang mendukung sinyal: X dari 5]
-KESIMPULAN: [Ringkasan 2-3 kalimat yang menjelaskan mengapa prediksi ini masuk akal untuk timeframe {tf_context['name']}]
+KESIMPULAN: Dalam {tf_context['next_candle']}, harga {asset_name} diprediksi [NAIK/TURUN/SIDEWAYS] karena [alasan utama]. [Tambahan konteks 1-2 kalimat]
 
-PENTING: Berikan angka SPESIFIK dan REALISTIS berdasarkan chart. Target profit harus dalam range {tf_context['tp_range']} sesuai timeframe {tf_context['name']}."""
+PENTING: Berikan angka SPESIFIK dan REALISTIS berdasarkan chart. Target profit harus dalam range {tf_context['tp_range']} sesuai timeframe {tf_context['name']}. Prediksi HARUS menyebutkan arah pergerakan untuk {tf_context['next_candle']}."""
 
     url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={GEMINI_API_KEY}"
     
@@ -955,7 +974,10 @@ def format_analysis_reply(text):
     text_clean = re.sub(r'^\s*[-•]\s*', '', text_clean, flags=re.MULTILINE)
     
     section_keywords = [
-        {'keywords': ['prediksi arah', 'prediksi'], 'emoji': '🔮', 'group': 'prediction'},
+        {'keywords': ['prediksi 1 menit', 'prediksi 5 menit', 'prediksi 15 menit', 'prediksi 30 menit', 
+                      'prediksi 1 jam', 'prediksi 4 jam', 'prediksi 1 hari', 'prediksi 1 minggu',
+                      'prediksi arah', 'prediksi'], 'emoji': '🔮', 'group': 'prediction'},
+        {'keywords': ['perkiraan pergerakan', 'perkiraan'], 'emoji': '📍', 'group': 'prediction'},
         {'keywords': ['sinyal', 'signal'], 'emoji': '📊', 'group': 'signal'},
         {'keywords': ['harga saat ini', 'harga sekarang', 'current price'], 'emoji': '💵', 'group': 'trading'},
         {'keywords': ['harga masuk', 'entry', 'masuk'], 'emoji': '🎯', 'group': 'trading'},
