@@ -2341,9 +2341,50 @@ async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE) -> N
 
 
 BOT_MODE = os.environ.get("BOT_MODE", "polling").lower()
-WEBHOOK_URL = os.environ.get("WEBHOOK_URL", "")
 WEBHOOK_PORT = int(os.environ.get("WEBHOOK_PORT", "5000"))
-WEBHOOK_PATH = os.environ.get("WEBHOOK_PATH", "/webhook")
+
+def get_webhook_url():
+    """Auto-detect webhook URL dari environment (Replit & Docker)"""
+    url = os.environ.get("WEBHOOK_URL", "")
+    if url:
+        return url
+    
+    replit_domains = os.environ.get("REPLIT_DOMAINS", "")
+    if replit_domains:
+        domain = replit_domains.split(",")[0].strip()
+        return f"https://{domain}"
+    
+    repl_slug = os.environ.get("REPL_SLUG", "")
+    repl_owner = os.environ.get("REPL_OWNER", "")
+    if repl_slug and repl_owner:
+        return f"https://{repl_slug}.{repl_owner}.repl.co"
+    
+    virtual_host = os.environ.get("VIRTUAL_HOST", "")
+    if virtual_host:
+        return f"https://{virtual_host}"
+    
+    app_domain = os.environ.get("APP_DOMAIN", "")
+    if app_domain:
+        protocol = "https" if not app_domain.startswith("http") else ""
+        return f"{protocol}://{app_domain}" if protocol else app_domain
+    
+    return ""
+
+def get_webhook_path():
+    """Auto-generate webhook path dengan unique identifier"""
+    path = os.environ.get("WEBHOOK_PATH", "")
+    if path:
+        return path
+    
+    repl_id = os.environ.get("REPL_ID", "")
+    if repl_id:
+        short_id = repl_id[:8]
+        return f"/webhook_{short_id}"
+    
+    return "/webhook"
+
+WEBHOOK_URL = get_webhook_url()
+WEBHOOK_PATH = get_webhook_path()
 
 
 def setup_application():
@@ -2380,9 +2421,8 @@ def run_polling_mode(app):
 def run_webhook_mode(app):
     """Jalankan bot dalam mode webhook (production)"""
     if not WEBHOOK_URL:
-        log_error("WEBHOOK_URL tidak ditemukan untuk mode webhook!")
-        log_info("Set WEBHOOK_URL di environment variables")
-        log_info("Contoh: WEBHOOK_URL=https://your-app.replit.app")
+        log_error("WEBHOOK_URL tidak dapat terdeteksi!")
+        log_info("Pastikan Anda menjalankan di Replit atau set WEBHOOK_URL manual")
         log_warning("Fallback ke mode polling...")
         run_polling_mode(app)
         return
@@ -2391,7 +2431,7 @@ def run_webhook_mode(app):
     webhook_full_url = f"{WEBHOOK_URL.rstrip('/')}/{webhook_path_clean}"
     
     log_info(f"Mode: WEBHOOK (Production)")
-    log_info(f"Webhook URL: {webhook_full_url}")
+    log_success(f"Webhook URL: {webhook_full_url}")
     log_info(f"Port: {WEBHOOK_PORT}")
     log_info(f"Path: /{webhook_path_clean}")
     print()
@@ -2449,11 +2489,24 @@ def main():
     print()
     print(f"{Colors.WHITE}{Colors.BOLD}  Konfigurasi Bot Mode:{Colors.RESET}")
     print()
-    log_info(f"BOT_MODE: {BOT_MODE}")
+    log_info(f"BOT_MODE: {BOT_MODE.upper()}")
     if BOT_MODE == "webhook":
-        log_info(f"WEBHOOK_URL: {WEBHOOK_URL or '(tidak diset)'}")
+        manual_url = os.environ.get("WEBHOOK_URL", "")
+        manual_path = os.environ.get("WEBHOOK_PATH", "")
+        
+        if manual_url:
+            log_info(f"WEBHOOK_URL: {WEBHOOK_URL} (manual)")
+        elif WEBHOOK_URL:
+            log_success(f"WEBHOOK_URL: {WEBHOOK_URL} (auto-detect)")
+        else:
+            log_warning(f"WEBHOOK_URL: (tidak terdeteksi)")
+        
         log_info(f"WEBHOOK_PORT: {WEBHOOK_PORT}")
-        log_info(f"WEBHOOK_PATH: {WEBHOOK_PATH}")
+        
+        if manual_path:
+            log_info(f"WEBHOOK_PATH: {WEBHOOK_PATH} (manual)")
+        else:
+            log_success(f"WEBHOOK_PATH: {WEBHOOK_PATH} (auto-generate)")
     
     print()
     print(f"{Colors.WHITE}{Colors.BOLD}  Memulai bot...{Colors.RESET}")

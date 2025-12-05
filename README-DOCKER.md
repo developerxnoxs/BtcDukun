@@ -14,6 +14,18 @@ Bot mendukung 2 mode operasi:
 | **Polling** | Development | Default, tidak perlu URL publik |
 | **Webhook** | Production | Lebih efisien, butuh URL publik (HTTPS) |
 
+## Auto-Detect Webhook (Baru!)
+
+Bot secara otomatis mendeteksi webhook URL dari environment variables:
+
+| Prioritas | Variable | Contoh |
+|-----------|----------|--------|
+| 1 | `WEBHOOK_URL` | `https://bot.example.com` |
+| 2 | `APP_DOMAIN` | `bot.example.com` |
+| 3 | `VIRTUAL_HOST` | `bot.example.com` (nginx-proxy) |
+
+**Webhook path juga auto-generate** jika tidak diset manual.
+
 ## Langkah Deployment
 
 ### 1. Clone atau Copy Project
@@ -25,23 +37,21 @@ cd trading-analysis-bot
 
 ### 2. Buat File Environment
 
-Buat file `.env` di folder project:
-
 **Mode Polling (Development):**
 ```bash
-TELEGRAM_BOT_TOKEN=your_telegram_bot_token_here
-GEMINI_API_KEY=your_gemini_api_key_here
+# .env
+TELEGRAM_BOT_TOKEN=your_token
+GEMINI_API_KEY=your_key
 BOT_MODE=polling
 ```
 
-**Mode Webhook (Production):**
+**Mode Webhook (Production) - Auto-detect:**
 ```bash
-TELEGRAM_BOT_TOKEN=your_telegram_bot_token_here
-GEMINI_API_KEY=your_gemini_api_key_here
+# .env
+TELEGRAM_BOT_TOKEN=your_token
+GEMINI_API_KEY=your_key
 BOT_MODE=webhook
-WEBHOOK_URL=https://your-domain.com
-WEBHOOK_PORT=5000
-WEBHOOK_PATH=/webhook
+APP_DOMAIN=bot.yourdomain.com
 ```
 
 ### 3. Build dan Jalankan
@@ -50,10 +60,16 @@ WEBHOOK_PATH=/webhook
 docker-compose up -d --build
 ```
 
-### 4. Cek Status Bot
+### 4. Cek Log & Status
 
 ```bash
 docker-compose logs -f trading-bot
+```
+
+Output saat auto-detect berhasil:
+```
+✓ WEBHOOK_URL: https://bot.yourdomain.com (auto-detect)
+✓ WEBHOOK_PATH: /webhook_abc12345 (auto-generate)
 ```
 
 ### 5. Stop Bot
@@ -62,102 +78,89 @@ docker-compose logs -f trading-bot
 docker-compose down
 ```
 
-## Konfigurasi Environment Variables
+## Environment Variables
 
 | Variable | Deskripsi | Default |
 |----------|-----------|---------|
 | `TELEGRAM_BOT_TOKEN` | Token bot dari @BotFather | - (wajib) |
 | `GEMINI_API_KEY` | API key dari Google AI Studio | - (opsional) |
-| `BOT_MODE` | Mode bot: `polling` atau `webhook` | `polling` |
-| `WEBHOOK_URL` | URL publik untuk webhook (HTTPS) | - |
-| `WEBHOOK_PORT` | Port untuk webhook server | `5000` |
-| `WEBHOOK_PATH` | Path endpoint webhook | `/webhook` |
+| `BOT_MODE` | `polling` atau `webhook` | `polling` |
+| `APP_DOMAIN` | Domain aplikasi (auto-detect webhook) | - |
+| `VIRTUAL_HOST` | Domain untuk nginx-proxy | - |
+| `WEBHOOK_URL` | URL lengkap webhook (override auto) | - |
+| `WEBHOOK_PORT` | Port webhook server | `5000` |
+| `WEBHOOK_PATH` | Path webhook (auto-generate jika kosong) | - |
 
-## Deployment Production dengan Webhook
+## Contoh Deployment
 
-### Menggunakan Nginx Reverse Proxy
+### Docker Compose Standar
 
-1. Jalankan bot dengan mode webhook:
 ```bash
+# .env
+TELEGRAM_BOT_TOKEN=123456:ABC...
+GEMINI_API_KEY=AIza...
 BOT_MODE=webhook
-WEBHOOK_URL=https://your-domain.com
+APP_DOMAIN=trading-bot.example.com
 ```
 
-2. Konfigurasi Nginx:
-```nginx
-server {
-    listen 443 ssl;
-    server_name your-domain.com;
-
-    ssl_certificate /path/to/cert.pem;
-    ssl_certificate_key /path/to/key.pem;
-
-    location /webhook {
-        proxy_pass http://localhost:5000/webhook;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-    }
-}
-```
-
-3. Restart Nginx dan jalankan bot:
 ```bash
-sudo systemctl restart nginx
 docker-compose up -d --build
+```
+
+### Dengan Nginx Reverse Proxy
+
+```bash
+# .env
+TELEGRAM_BOT_TOKEN=123456:ABC...
+GEMINI_API_KEY=AIza...
+BOT_MODE=webhook
+VIRTUAL_HOST=trading-bot.example.com
+LETSENCRYPT_HOST=trading-bot.example.com
+```
+
+Bot akan otomatis menggunakan `VIRTUAL_HOST` sebagai webhook URL.
+
+### Dengan Traefik
+
+```yaml
+services:
+  trading-bot:
+    labels:
+      - "traefik.http.routers.bot.rule=Host(`bot.example.com`)"
+    environment:
+      - APP_DOMAIN=bot.example.com
+      - BOT_MODE=webhook
 ```
 
 ## Perintah Berguna
 
 | Perintah | Fungsi |
 |----------|--------|
-| `docker-compose up -d` | Jalankan bot di background |
-| `docker-compose down` | Hentikan bot |
-| `docker-compose restart` | Restart bot |
-| `docker-compose logs -f` | Lihat log realtime |
-| `docker-compose build --no-cache` | Rebuild image dari awal |
+| `docker-compose up -d` | Jalankan di background |
+| `docker-compose down` | Hentikan |
+| `docker-compose restart` | Restart |
+| `docker-compose logs -f` | Log realtime |
+| `docker-compose build --no-cache` | Rebuild |
 
 ## Troubleshooting
 
-### Bot tidak merespon
-```bash
-docker-compose logs trading-bot
-```
-
 ### Cek mode yang aktif
-Lihat log saat startup, akan muncul:
-- `Mode: POLLING (Development)` - jika mode polling
-- `Mode: WEBHOOK (Production)` - jika mode webhook
-
-### Webhook tidak bekerja
-1. Pastikan `WEBHOOK_URL` sudah benar dan menggunakan HTTPS
-2. Pastikan port 5000 terbuka dan dapat diakses dari internet
-3. Cek apakah SSL certificate valid
-
-### Rebuild setelah update code
 ```bash
-docker-compose down
-docker-compose up -d --build
+docker-compose logs trading-bot | grep "BOT_MODE"
 ```
 
-### Hapus semua data dan mulai fresh
+### Webhook tidak terdeteksi
+Pastikan salah satu variabel ini diset:
+- `WEBHOOK_URL`
+- `APP_DOMAIN`  
+- `VIRTUAL_HOST`
+
+### Bot fallback ke polling
+Jika webhook URL tidak terdeteksi, bot otomatis fallback ke mode polling.
+
+### Rebuild setelah update
 ```bash
-docker-compose down -v
-docker system prune -a
-docker-compose up -d --build
-```
-
-## Struktur File
-
-```
-trading-analysis-bot/
-├── main.py              # Kode utama bot
-├── requirements.txt     # Dependencies Python
-├── Dockerfile          # Konfigurasi Docker image
-├── docker-compose.yml  # Konfigurasi Docker Compose
-├── .dockerignore       # File yang diabaikan saat build
-├── .env                # Environment variables (buat sendiri)
-├── .env.example        # Template environment variables
-└── logs/               # Folder log (auto-generated)
+docker-compose down && docker-compose up -d --build
 ```
 
 ## Catatan Keamanan
@@ -165,4 +168,4 @@ trading-analysis-bot/
 - Jangan commit file `.env` ke repository
 - Gunakan Docker secrets untuk production
 - Pastikan SSL certificate valid untuk webhook
-- Batasi akses port 5000 hanya dari reverse proxy
+- Batasi akses port 5000 dari reverse proxy saja

@@ -16,12 +16,14 @@ ENV PYTHONUNBUFFERED=1
 ENV PYTHONDONTWRITEBYTECODE=1
 
 # Default mode: polling (untuk development)
-# Ubah ke webhook untuk production
 ENV BOT_MODE=polling
-ENV WEBHOOK_PORT=5000
-ENV WEBHOOK_PATH=/webhook
 
-# Expose port untuk webhook mode
+# Webhook otomatis terdeteksi dari:
+# - WEBHOOK_URL (prioritas 1)
+# - APP_DOMAIN (prioritas 2) 
+# - VIRTUAL_HOST (prioritas 3, untuk nginx-proxy)
+# Jika tidak diset, path akan auto-generate
+
 EXPOSE 5000
 
 CMD ["python", "main.py"]

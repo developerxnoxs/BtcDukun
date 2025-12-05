@@ -1,7 +1,6 @@
 version: '3.8'
 
 services:
-  # Mode Polling (Development)
   trading-bot:
     build: .
     container_name: trading-analysis-bot
@@ -10,9 +9,13 @@ services:
       - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
       - GEMINI_API_KEY=${GEMINI_API_KEY}
       - BOT_MODE=${BOT_MODE:-polling}
+      # Auto-detect: Set salah satu dari ini untuk webhook otomatis
       - WEBHOOK_URL=${WEBHOOK_URL:-}
+      - APP_DOMAIN=${APP_DOMAIN:-}
+      - VIRTUAL_HOST=${VIRTUAL_HOST:-}
+      # Konfigurasi manual (opsional)
       - WEBHOOK_PORT=${WEBHOOK_PORT:-5000}
-      - WEBHOOK_PATH=${WEBHOOK_PATH:-/webhook}
+      - WEBHOOK_PATH=${WEBHOOK_PATH:-}
     ports:
       - "${WEBHOOK_PORT:-5000}:5000"
     volumes:
@@ -23,26 +26,3 @@ services:
       timeout: 10s
       retries: 3
       start_period: 10s
-
-  # Mode Webhook (Production) - Uncomment untuk menggunakan
-  # trading-bot-webhook:
-  #   build: .
-  #   container_name: trading-analysis-bot-webhook
-  #   restart: unless-stopped
-  #   environment:
-  #     - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
-  #     - GEMINI_API_KEY=${GEMINI_API_KEY}
-  #     - BOT_MODE=webhook
-  #     - WEBHOOK_URL=${WEBHOOK_URL}
-  #     - WEBHOOK_PORT=5000
-  #     - WEBHOOK_PATH=/webhook
-  #   ports:
-  #     - "5000:5000"
-  #   volumes:
-  #     - ./logs:/app/logs
-  #   healthcheck:
-  #     test: ["CMD", "curl", "-f", "http://localhost:5000/"]
-  #     interval: 30s
-  #     timeout: 10s
-  #     retries: 3
-  #     start_period: 10s
