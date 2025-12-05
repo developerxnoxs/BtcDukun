@@ -2340,6 +2340,76 @@ async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE) -> N
         logger.warning("Konflik bot terdeteksi - mungkin ada instance lain yang berjalan")
 
 
+BOT_MODE = os.environ.get("BOT_MODE", "polling").lower()
+WEBHOOK_URL = os.environ.get("WEBHOOK_URL", "")
+WEBHOOK_PORT = int(os.environ.get("WEBHOOK_PORT", "5000"))
+WEBHOOK_PATH = os.environ.get("WEBHOOK_PATH", "/webhook")
+
+
+def setup_application():
+    """Setup bot application dengan handlers"""
+    app = Application.builder().token(TELEGRAM_BOT_TOKEN).build()
+    
+    app.add_handler(CommandHandler("start", cmd_start))
+    app.add_handler(CommandHandler("analyze", cmd_analyze))
+    app.add_handler(CommandHandler("price", cmd_price))
+    app.add_handler(CommandHandler("help", cmd_help))
+    
+    app.add_handler(CallbackQueryHandler(handle_market_callback, pattern=r'^(market_|back_to_main|ignore)'))
+    app.add_handler(CallbackQueryHandler(handle_crypto_callback, pattern=r'^crypto_'))
+    app.add_handler(CallbackQueryHandler(handle_forex_callback, pattern=r'^forex_'))
+    app.add_handler(CallbackQueryHandler(handle_timeframe_callback, pattern=r'^tf_'))
+    
+    app.add_error_handler(error_handler)
+    
+    return app
+
+
+def run_polling_mode(app):
+    """Jalankan bot dalam mode polling (development)"""
+    log_info("Mode: POLLING (Development)")
+    print()
+    print(f"{Colors.GREEN}{Colors.BOLD}  ══════════════════════════════════════════{Colors.RESET}")
+    print(f"{Colors.GREEN}  Bot berjalan (Polling)... Tekan Ctrl+C untuk berhenti{Colors.RESET}")
+    print(f"{Colors.GREEN}{Colors.BOLD}  ══════════════════════════════════════════{Colors.RESET}")
+    print()
+    
+    app.run_polling(allowed_updates=Update.ALL_TYPES, drop_pending_updates=True)
+
+
+def run_webhook_mode(app):
+    """Jalankan bot dalam mode webhook (production)"""
+    if not WEBHOOK_URL:
+        log_error("WEBHOOK_URL tidak ditemukan untuk mode webhook!")
+        log_info("Set WEBHOOK_URL di environment variables")
+        log_info("Contoh: WEBHOOK_URL=https://your-app.replit.app")
+        log_warning("Fallback ke mode polling...")
+        run_polling_mode(app)
+        return
+    
+    webhook_path_clean = WEBHOOK_PATH.lstrip('/')
+    webhook_full_url = f"{WEBHOOK_URL.rstrip('/')}/{webhook_path_clean}"
+    
+    log_info(f"Mode: WEBHOOK (Production)")
+    log_info(f"Webhook URL: {webhook_full_url}")
+    log_info(f"Port: {WEBHOOK_PORT}")
+    log_info(f"Path: /{webhook_path_clean}")
+    print()
+    print(f"{Colors.GREEN}{Colors.BOLD}  ══════════════════════════════════════════{Colors.RESET}")
+    print(f"{Colors.GREEN}  Bot berjalan (Webhook)... Tekan Ctrl+C untuk berhenti{Colors.RESET}")
+    print(f"{Colors.GREEN}{Colors.BOLD}  ══════════════════════════════════════════{Colors.RESET}")
+    print()
+    
+    app.run_webhook(
+        listen="0.0.0.0",
+        port=WEBHOOK_PORT,
+        url_path=webhook_path_clean,
+        webhook_url=webhook_full_url,
+        allowed_updates=Update.ALL_TYPES,
+        drop_pending_updates=True
+    )
+
+
 def main():
     """Fungsi utama untuk menjalankan bot"""
     print_banner()
@@ -2377,31 +2447,26 @@ def main():
     log_info(f"Forex & Komoditas: {len(FOREX_PAIRS)} pasangan didukung")
     
     print()
+    print(f"{Colors.WHITE}{Colors.BOLD}  Konfigurasi Bot Mode:{Colors.RESET}")
+    print()
+    log_info(f"BOT_MODE: {BOT_MODE}")
+    if BOT_MODE == "webhook":
+        log_info(f"WEBHOOK_URL: {WEBHOOK_URL or '(tidak diset)'}")
+        log_info(f"WEBHOOK_PORT: {WEBHOOK_PORT}")
+        log_info(f"WEBHOOK_PATH: {WEBHOOK_PATH}")
+    
+    print()
     print(f"{Colors.WHITE}{Colors.BOLD}  Memulai bot...{Colors.RESET}")
     print()
     
-    app = Application.builder().token(TELEGRAM_BOT_TOKEN).build()
-    
-    app.add_handler(CommandHandler("start", cmd_start))
-    app.add_handler(CommandHandler("analyze", cmd_analyze))
-    app.add_handler(CommandHandler("price", cmd_price))
-    app.add_handler(CommandHandler("help", cmd_help))
-    
-    app.add_handler(CallbackQueryHandler(handle_market_callback, pattern=r'^(market_|back_to_main|ignore)'))
-    app.add_handler(CallbackQueryHandler(handle_crypto_callback, pattern=r'^crypto_'))
-    app.add_handler(CallbackQueryHandler(handle_forex_callback, pattern=r'^forex_'))
-    app.add_handler(CallbackQueryHandler(handle_timeframe_callback, pattern=r'^tf_'))
-    
-    app.add_error_handler(error_handler)
+    app = setup_application()
     
     log_success("Bot siap menerima pesan!")
-    print()
-    print(f"{Colors.GREEN}{Colors.BOLD}  ══════════════════════════════════════════{Colors.RESET}")
-    print(f"{Colors.GREEN}  Bot berjalan... Tekan Ctrl+C untuk berhenti{Colors.RESET}")
-    print(f"{Colors.GREEN}{Colors.BOLD}  ══════════════════════════════════════════{Colors.RESET}")
-    print()
     
-    app.run_polling(allowed_updates=Update.ALL_TYPES, drop_pending_updates=True)
+    if BOT_MODE == "webhook":
+        run_webhook_mode(app)
+    else:
+        run_polling_mode(app)
 
 
 if __name__ == "__main__":

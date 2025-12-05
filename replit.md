@@ -127,16 +127,59 @@ Bot mengambil konfigurasi dari file `.env` atau environment variables.
 1. Salin `.env.example` ke `.env`
 2. Isi dengan nilai yang benar
 
-| Variable | Deskripsi |
-|----------|-----------|
-| `TELEGRAM_BOT_TOKEN` | Token bot Telegram (dari @BotFather) |
-| `GEMINI_API_KEY` | Google Gemini API key (dari Google AI Studio) |
+### Environment Variables
 
-**Contoh file .env:**
+| Variable | Deskripsi | Default |
+|----------|-----------|---------|
+| `TELEGRAM_BOT_TOKEN` | Token bot Telegram (dari @BotFather) | - (wajib) |
+| `GEMINI_API_KEY` | Google Gemini API key (dari Google AI Studio) | - (opsional) |
+| `BOT_MODE` | Mode bot: `polling` atau `webhook` | `polling` |
+| `WEBHOOK_URL` | URL publik untuk webhook (wajib jika mode webhook) | - |
+| `WEBHOOK_PORT` | Port untuk webhook server | `5000` |
+| `WEBHOOK_PATH` | Path endpoint webhook | `/webhook` |
+
+**Contoh file .env (Mode Polling - Development):**
 ```
 TELEGRAM_BOT_TOKEN=1234567890:ABCdefGhIjKlMnOpQrStUvWxYz
 GEMINI_API_KEY=AIzaSyxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+BOT_MODE=polling
 ```
+
+**Contoh file .env (Mode Webhook - Production):**
+```
+TELEGRAM_BOT_TOKEN=1234567890:ABCdefGhIjKlMnOpQrStUvWxYz
+GEMINI_API_KEY=AIzaSyxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+BOT_MODE=webhook
+WEBHOOK_URL=https://your-app.replit.app
+WEBHOOK_PORT=5000
+WEBHOOK_PATH=/webhook
+```
+
+## Mode Bot (v3.3)
+
+Bot mendukung 2 mode operasi:
+
+### 1. Polling Mode (Default - Development)
+- Bot terus-menerus bertanya ke Telegram API untuk update baru
+- Cocok untuk development dan testing
+- Tidak memerlukan URL publik
+- Set: `BOT_MODE=polling`
+
+### 2. Webhook Mode (Production)
+- Telegram mengirim update langsung ke URL bot
+- Lebih efisien untuk production dengan banyak pengguna
+- Memerlukan URL publik (HTTPS)
+- Set: `BOT_MODE=webhook` + `WEBHOOK_URL=https://...`
+
+**Kapan menggunakan Webhook:**
+- Deployment production di Replit
+- Menangani banyak pengguna bersamaan
+- Lebih hemat resource
+
+**Kapan menggunakan Polling:**
+- Development lokal
+- Testing fitur baru
+- Debug dan troubleshooting
 
 ## Workflow
 
@@ -168,6 +211,14 @@ GEMINI_API_KEY=AIzaSyxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 - Output dalam Bahasa Indonesia
 
 ## Perubahan Terbaru
+
+- 2024-12-05: **v3.3 - Dual Mode Support (Polling & Webhook)**
+  - Bot sekarang mendukung 2 mode operasi: Polling dan Webhook
+  - Environment variable baru: `BOT_MODE`, `WEBHOOK_URL`, `WEBHOOK_PORT`, `WEBHOOK_PATH`
+  - Mode Polling: Default untuk development, tidak perlu URL publik
+  - Mode Webhook: Untuk production, lebih efisien menangani banyak pengguna
+  - Fallback otomatis ke polling jika WEBHOOK_URL tidak diset
+  - Dokumentasi lengkap untuk konfigurasi kedua mode
 
 - 2024-12-04: **v3.2 - TradingView Candle Sync & Fresh Data**
   - Menambahkan sinkronisasi waktu verifikasi dengan jadwal candle close TradingView (UTC)
