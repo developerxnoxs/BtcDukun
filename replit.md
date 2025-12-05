@@ -185,7 +185,7 @@ Bot mendukung 2 mode operasi:
 
 | Nama | Perintah | Deskripsi |
 |------|----------|-----------|
-| Trading Analysis Bot | `uv run python main.py` | Bot analisa crypto & forex |
+| Trading Analysis Bot | `python main.py` | Bot analisa crypto & forex |
 
 ## Sumber Data
 
