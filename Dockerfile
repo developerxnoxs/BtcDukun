@@ -15,4 +15,13 @@ COPY main.py .
 ENV PYTHONUNBUFFERED=1
 ENV PYTHONDONTWRITEBYTECODE=1
 
+# Default mode: polling (untuk development)
+# Ubah ke webhook untuk production
+ENV BOT_MODE=polling
+ENV WEBHOOK_PORT=5000
+ENV WEBHOOK_PATH=/webhook
+
+# Expose port untuk webhook mode
+EXPOSE 5000
+
 CMD ["python", "main.py"]
