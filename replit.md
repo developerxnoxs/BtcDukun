@@ -19,16 +19,23 @@ Semua output dalam **Bahasa Indonesia**.
 
 ```
 ai-trading-analysis-bots/
-├── main.py                  # Bot utama (gabungan crypto + forex)
+├── main.py                  # Bot utama (gabungan crypto + forex + MT5)
 ├── src/
 │   ├── __init__.py          # Package initialization
+│   ├── mt5_trader.py        # Modul auto-trading MetaTrader 5
 │   ├── btc_analyzer.py      # [DEPRECATED] Gunakan main.py
 │   └── xau_analyzer.py      # [DEPRECATED] Gunakan main.py
+├── scripts/
+│   └── mt5_launcher.sh      # Script launcher MT5 untuk Docker
 ├── docs/
 │   ├── API.md               # Dokumentasi API
 │   └── TECHNICAL_INDICATORS.md
 ├── assets/                  # Gambar dan screenshots
 ├── examples/                # Contoh penggunaan
+├── Dockerfile               # Docker image dengan Wine/VNC
+├── docker-compose.yml       # Konfigurasi container
+├── supervisord.conf         # Konfigurasi supervisor
+├── README-DOCKER.md         # Panduan deployment Docker + MT5
 ├── CHANGELOG.md             # Riwayat versi
 ├── CODE_OF_CONDUCT.md       # Panduan komunitas
 ├── CONTRIBUTING.md          # Panduan kontribusi
@@ -211,6 +218,15 @@ Bot mendukung 2 mode operasi:
 - Output dalam Bahasa Indonesia
 
 ## Perubahan Terbaru
+
+- 2024-12-06: **v3.4 - MetaTrader 5 Auto-Trading Integration**
+  - Menambahkan modul `src/mt5_trader.py` untuk auto-trading dengan MetaTrader 5
+  - Perintah bot baru: `/mt5status`, `/positions`, `/trade`, `/close`, `/autotrade`
+  - Docker image mendukung Wine untuk menjalankan MT5 di Linux
+  - Supervisor mengelola Xvfb, Fluxbox, VNC, dan bot
+  - Port VNC (5900) untuk akses GUI MetaTrader 5
+  - Dokumentasi lengkap di README-DOCKER.md untuk setup MT5
+  - Graceful fallback ke mode analisa jika MT5 tidak tersedia
 
 - 2024-12-05: **v3.3 - Dual Mode Support (Polling & Webhook)**
   - Bot sekarang mendukung 2 mode operasi: Polling dan Webhook
